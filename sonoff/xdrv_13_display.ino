@@ -77,11 +77,16 @@ enum XdspFunctions { FUNC_DISPLAY_INIT_DRIVER, FUNC_DISPLAY_INIT, FUNC_DISPLAY_E
 
 enum DisplayInitModes { DISPLAY_INIT_MODE, DISPLAY_INIT_PARTIAL, DISPLAY_INIT_FULL };
 
-enum DisplayCommands { CMND_DISPLAY, CMND_DISP_MODEL, CMND_DISP_WIDTH, CMND_DISP_HEIGHT, CMND_DISP_MODE, CMND_DISP_REFRESH, CMND_DISP_DIMMER, CMND_DISP_COLS, CMND_DISP_ROWS,
-  CMND_DISP_SIZE, CMND_DISP_FONT, CMND_DISP_ROTATE, CMND_DISP_TEXT, CMND_DISP_ADDRESS };
 const char kDisplayCommands[] PROGMEM =
-  "|" D_CMND_DISP_MODEL "|" D_CMND_DISP_WIDTH "|" D_CMND_DISP_HEIGHT "|" D_CMND_DISP_MODE "|" D_CMND_DISP_REFRESH "|" D_CMND_DISP_DIMMER "|" D_CMND_DISP_COLS "|" D_CMND_DISP_ROWS "|"
-  D_CMND_DISP_SIZE "|" D_CMND_DISP_FONT "|" D_CMND_DISP_ROTATE "|" D_CMND_DISP_TEXT "|" D_CMND_DISP_ADDRESS ;
+  "|" D_CMND_DISP_MODEL "|" D_CMND_DISP_WIDTH "|" D_CMND_DISP_HEIGHT "|" D_CMND_DISP_MODE "|" D_CMND_DISP_REFRESH "|"
+  D_CMND_DISP_DIMMER "|" D_CMND_DISP_COLS "|" D_CMND_DISP_ROWS "|" D_CMND_DISP_SIZE "|" D_CMND_DISP_FONT "|"
+  D_CMND_DISP_ROTATE "|" D_CMND_DISP_TEXT "|" D_CMND_DISP_ADDRESS ;
+
+void (* const DisplayCommand[])(void) PROGMEM = {
+  &CmndDisplay, &CmndDisplayModel, &CmndDisplayWidth, &CmndDisplayHeight, &CmndDisplayMode, &CmndDisplayRefresh,
+  &CmndDisplayDimmer, &CmndDisplayColumns, &CmndDisplayRows, &CmndDisplaySize, &CmndDisplayFont,
+  &CmndDisplayRotate, &CmndDisplayText, &CmndDisplayAddress };
+
 
 const char S_JSON_DISPLAY_COMMAND_VALUE[] PROGMEM =        "{\"" D_CMND_DISPLAY "%s\":\"%s\"}";
 const char S_JSON_DISPLAY_COMMAND_NVALUE[] PROGMEM =       "{\"" D_CMND_DISPLAY "%s\":%d}";
@@ -1269,58 +1274,66 @@ void DisplaySetPower(void)
 /*********************************************************************************************\
  * Commands
 \*********************************************************************************************/
-
-bool DisplayCommand(void)
+void ResponseDisplayCmndNumber(int value)
 {
-  char command [CMDSZ];
-  bool serviced = true;
-  uint8_t disp_len = strlen(D_CMND_DISPLAY);  // Prep for string length change
+  Response_P(PSTR("{\"" D_CMND_DISPLAY "%s\":%d}"), XdrvMailbox.command, value);
+}
 
-  if (!strncasecmp_P(XdrvMailbox.topic, PSTR(D_CMND_DISPLAY), disp_len)) {  // Prefix
-    int command_code = GetCommandCode(command, sizeof(command), XdrvMailbox.topic +disp_len, kDisplayCommands);
-    if (-1 == command_code) {
-      serviced = false;  // Unknown command
-    }
-    else if (CMND_DISPLAY == command_code) {
-      Response_P(PSTR("{\"" D_CMND_DISPLAY "\":{\"" D_CMND_DISP_MODEL "\":%d,\"" D_CMND_DISP_WIDTH "\":%d,\"" D_CMND_DISP_HEIGHT "\":%d,\"" D_CMND_DISP_MODE "\":%d,\""
-        D_CMND_DISP_DIMMER "\":%d,\"" D_CMND_DISP_SIZE "\":%d,\"" D_CMND_DISP_FONT "\":%d,\"" D_CMND_DISP_ROTATE "\":%d,\"" D_CMND_DISP_REFRESH "\":%d,\""
-        D_CMND_DISP_COLS "\":[%d,%d],\"" D_CMND_DISP_ROWS "\":%d}}"),
-        Settings.display_model, Settings.display_width, Settings.display_height, Settings.display_mode,
-        Settings.display_dimmer, Settings.display_size, Settings.display_font, Settings.display_rotate, Settings.display_refresh,
-        Settings.display_cols[0], Settings.display_cols[1], Settings.display_rows);
+void ResponseDisplayCmndIdxNumber(int value)
+{
+  Response_P(PSTR("{\"" D_CMND_DISPLAY "%s%d\":%d}"), XdrvMailbox.command, XdrvMailbox.index, value);
+}
 
+/*********************************************************************************************/
+
+void CmndDisplay(void)
+{
+  Response_P(PSTR("{\"" D_CMND_DISPLAY "\":{\"" D_CMND_DISP_MODEL "\":%d,\"" D_CMND_DISP_WIDTH "\":%d,\"" D_CMND_DISP_HEIGHT "\":%d,\""
+    D_CMND_DISP_MODE "\":%d,\"" D_CMND_DISP_DIMMER "\":%d,\"" D_CMND_DISP_SIZE "\":%d,\"" D_CMND_DISP_FONT "\":%d,\""
+    D_CMND_DISP_ROTATE "\":%d,\"" D_CMND_DISP_REFRESH "\":%d,\"" D_CMND_DISP_COLS "\":[%d,%d],\"" D_CMND_DISP_ROWS "\":%d}}"),
+    Settings.display_model, Settings.display_width, Settings.display_height,
+    Settings.display_mode, Settings.display_dimmer, Settings.display_size, Settings.display_font,
+    Settings.display_rotate, Settings.display_refresh, Settings.display_cols[0], Settings.display_cols[1], Settings.display_rows);
+}
+
+void CmndDisplayModel(void)
+{
+  if ((XdrvMailbox.payload >= 0) && (XdrvMailbox.payload < DISPLAY_MAX_DRIVERS)) {
+    uint32_t last_display_model = Settings.display_model;
+    Settings.display_model = XdrvMailbox.payload;
+    if (XdspCall(FUNC_DISPLAY_MODEL)) {
+      restart_flag = 2;  // Restart to re-init interface and add/Remove MQTT subscribe
+    } else {
+      Settings.display_model = last_display_model;
     }
-    else if (CMND_DISP_MODEL == command_code) {
-      if ((XdrvMailbox.payload >= 0) && (XdrvMailbox.payload < DISPLAY_MAX_DRIVERS)) {
-        uint8_t last_display_model = Settings.display_model;
-        Settings.display_model = XdrvMailbox.payload;
-        if (XdspCall(FUNC_DISPLAY_MODEL)) {
-          restart_flag = 2;  // Restart to re-init interface and add/Remove MQTT subscribe
-        } else {
-          Settings.display_model = last_display_model;
-        }
-      }
-      Response_P(S_JSON_DISPLAY_COMMAND_NVALUE, command, Settings.display_model);
+  }
+  ResponseDisplayCmndNumber(Settings.display_model);
+}
+
+void CmndDisplayWidth(void)
+{
+  if (XdrvMailbox.payload > 0) {
+    if (XdrvMailbox.payload != Settings.display_width) {
+      Settings.display_width = XdrvMailbox.payload;
+      restart_flag = 2;  // Restart to re-init width
     }
-    else if (CMND_DISP_WIDTH == command_code) {
-      if (XdrvMailbox.payload > 0) {
-        if (XdrvMailbox.payload != Settings.display_width) {
-          Settings.display_width = XdrvMailbox.payload;
-          restart_flag = 2;  // Restart to re-init width
-        }
-      }
-      Response_P(S_JSON_DISPLAY_COMMAND_NVALUE, command, Settings.display_width);
+  }
+  ResponseDisplayCmndNumber(Settings.display_width);
+}
+
+void CmndDisplayHeight(void)
+{
+  if (XdrvMailbox.payload > 0) {
+    if (XdrvMailbox.payload != Settings.display_height) {
+      Settings.display_height = XdrvMailbox.payload;
+      restart_flag = 2;  // Restart to re-init height
     }
-    else if (CMND_DISP_HEIGHT == command_code) {
-      if (XdrvMailbox.payload > 0) {
-        if (XdrvMailbox.payload != Settings.display_height) {
-          Settings.display_height = XdrvMailbox.payload;
-          restart_flag = 2;  // Restart to re-init height
-        }
-      }
-      Response_P(S_JSON_DISPLAY_COMMAND_NVALUE, command, Settings.display_height);
-    }
-    else if (CMND_DISP_MODE == command_code) {
+  }
+  ResponseDisplayCmndNumber(Settings.display_height);
+}
+
+void CmndDisplayMode(void)
+{
 #ifdef USE_DISPLAY_MODES1TO5
 /*     Matrix               LCD / Oled                           TFT
  * 1 = Text up and time     Time
@@ -1329,133 +1342,145 @@ bool DisplayCommand(void)
  * 4 = Mqtt left and time   Mqtt (incl local) sensors            Mqtt (incl local) sensors
  * 5 = Mqtt up and time     Mqtt (incl local) sensors and time   Mqtt (incl local) sensors and time
 */
-      if ((XdrvMailbox.payload >= 0) && (XdrvMailbox.payload <= 5)) {
-        uint32_t last_display_mode = Settings.display_mode;
-        Settings.display_mode = XdrvMailbox.payload;
+  if ((XdrvMailbox.payload >= 0) && (XdrvMailbox.payload <= 5)) {
+    uint32_t last_display_mode = Settings.display_mode;
+    Settings.display_mode = XdrvMailbox.payload;
 
-        if (disp_subscribed != (Settings.display_mode &0x04)) {
-          restart_flag = 2;  // Restart to Add/Remove MQTT subscribe
-        } else {
-          if (last_display_mode && !Settings.display_mode) {  // Switch to mode 0
-            DisplayInit(DISPLAY_INIT_MODE);
-            if (renderer) renderer->fillScreen(bg_color);
-            else DisplayClear();
-          } else {
-            DisplayLogBufferInit();
-            DisplayInit(DISPLAY_INIT_MODE);
-          }
-        }
-      }
-#endif  // USE_DISPLAY_MODES1TO5
-      Response_P(S_JSON_DISPLAY_COMMAND_NVALUE, command, Settings.display_mode);
-    }
-    else if (CMND_DISP_DIMMER == command_code) {
-      if ((XdrvMailbox.payload >= 0) && (XdrvMailbox.payload <= 100)) {
-        Settings.display_dimmer = ((XdrvMailbox.payload +1) * 100) / 666;  // Correction for Domoticz (0 - 15)
-        if (Settings.display_dimmer && !(disp_power)) {
-          ExecuteCommandPower(disp_device, POWER_ON, SRC_DISPLAY);
-        }
-        else if (!Settings.display_dimmer && disp_power) {
-          ExecuteCommandPower(disp_device, POWER_OFF, SRC_DISPLAY);
-        }
-        if (renderer) renderer->dim(Settings.display_dimmer);
-      }
-      Response_P(S_JSON_DISPLAY_COMMAND_NVALUE, command, Settings.display_dimmer);
-    }
-    else if (CMND_DISP_SIZE == command_code) {
-      if ((XdrvMailbox.payload > 0) && (XdrvMailbox.payload <= 4)) {
-        Settings.display_size = XdrvMailbox.payload;
-      }
-      Response_P(S_JSON_DISPLAY_COMMAND_NVALUE, command, Settings.display_size);
-    }
-    else if (CMND_DISP_FONT == command_code) {
-      if ((XdrvMailbox.payload > 0) && (XdrvMailbox.payload <= 4)) {
-        Settings.display_font = XdrvMailbox.payload;
-      }
-      Response_P(S_JSON_DISPLAY_COMMAND_NVALUE, command, Settings.display_font);
-    }
-    else if (CMND_DISP_ROTATE == command_code) {
-      if ((XdrvMailbox.payload >= 0) && (XdrvMailbox.payload < 4)) {
-        if (Settings.display_rotate != XdrvMailbox.payload) {
-/*
-          // Needs font info regarding height and width
-          if ((Settings.display_rotate &1) != (XdrvMailbox.payload &1)) {
-            uint8_t temp_rows = Settings.display_rows;
-            Settings.display_rows = Settings.display_cols[0];
-            Settings.display_cols[0] = temp_rows;
-#ifdef USE_DISPLAY_MODES1TO5
-            DisplayReAllocScreenBuffer();
-#endif  // USE_DISPLAY_MODES1TO5
-          }
-*/
-          Settings.display_rotate = XdrvMailbox.payload;
-          DisplayInit(DISPLAY_INIT_MODE);
-#ifdef USE_DISPLAY_MODES1TO5
-          DisplayLogBufferInit();
-#endif  // USE_DISPLAY_MODES1TO5
-        }
-      }
-      Response_P(S_JSON_DISPLAY_COMMAND_NVALUE, command, Settings.display_rotate);
-    }
-    else if (CMND_DISP_TEXT == command_code) {
-      mqtt_data[0] = '\0';
-      if (disp_device && XdrvMailbox.data_len > 0) {
-#ifndef USE_DISPLAY_MODES1TO5
-        DisplayText();
-#else
-        if (!Settings.display_mode) {
-          DisplayText();
-        } else {
-          DisplayLogBufferAdd(XdrvMailbox.data);
-        }
-#endif  // USE_DISPLAY_MODES1TO5
+    if (disp_subscribed != (Settings.display_mode &0x04)) {
+      restart_flag = 2;  // Restart to Add/Remove MQTT subscribe
+    } else {
+      if (last_display_mode && !Settings.display_mode) {  // Switch to mode 0
+        DisplayInit(DISPLAY_INIT_MODE);
+        if (renderer) renderer->fillScreen(bg_color);
+        else DisplayClear();
       } else {
-        Response_P(PSTR("No Text"));
-      }
-      if (mqtt_data[0] == '\0') {
-        Response_P(S_JSON_DISPLAY_COMMAND_VALUE, command, XdrvMailbox.data);
-      }
-    }
-    else if ((CMND_DISP_ADDRESS == command_code) && (XdrvMailbox.index > 0) && (XdrvMailbox.index <= 8)) {
-      if ((XdrvMailbox.payload >= 0) && (XdrvMailbox.payload <= 255)) {
-        Settings.display_address[XdrvMailbox.index -1] = XdrvMailbox.payload;
-      }
-      Response_P(S_JSON_DISPLAY_COMMAND_INDEX_NVALUE, command, XdrvMailbox.index, Settings.display_address[XdrvMailbox.index -1]);
-    }
-    else if (CMND_DISP_REFRESH == command_code) {
-      if ((XdrvMailbox.payload >= 1) && (XdrvMailbox.payload <= 7)) {
-        Settings.display_refresh = XdrvMailbox.payload;
-      }
-      Response_P(S_JSON_DISPLAY_COMMAND_NVALUE, command, Settings.display_refresh);
-    }
-    else if ((CMND_DISP_COLS == command_code) && (XdrvMailbox.index > 0) && (XdrvMailbox.index <= 2)) {
-      if ((XdrvMailbox.payload > 0) && (XdrvMailbox.payload <= DISPLAY_MAX_COLS)) {
-        Settings.display_cols[XdrvMailbox.index -1] = XdrvMailbox.payload;
-#ifdef USE_DISPLAY_MODES1TO5
-        if (1 == XdrvMailbox.index) {
-          DisplayLogBufferInit();
-          DisplayReAllocScreenBuffer();
-        }
-#endif  // USE_DISPLAY_MODES1TO5
-      }
-      Response_P(S_JSON_DISPLAY_COMMAND_INDEX_NVALUE, command, XdrvMailbox.index, Settings.display_cols[XdrvMailbox.index -1]);
-    }
-    else if (CMND_DISP_ROWS == command_code) {
-      if ((XdrvMailbox.payload > 0) && (XdrvMailbox.payload <= DISPLAY_MAX_ROWS)) {
-        Settings.display_rows = XdrvMailbox.payload;
-#ifdef USE_DISPLAY_MODES1TO5
         DisplayLogBufferInit();
+        DisplayInit(DISPLAY_INIT_MODE);
+      }
+    }
+  }
+#endif  // USE_DISPLAY_MODES1TO5
+  ResponseDisplayCmndNumber(Settings.display_mode);
+}
+
+void CmndDisplayDimmer(void)
+{
+  if ((XdrvMailbox.payload >= 0) && (XdrvMailbox.payload <= 100)) {
+    Settings.display_dimmer = ((XdrvMailbox.payload +1) * 100) / 666;  // Correction for Domoticz (0 - 15)
+    if (Settings.display_dimmer && !(disp_power)) {
+      ExecuteCommandPower(disp_device, POWER_ON, SRC_DISPLAY);
+    }
+    else if (!Settings.display_dimmer && disp_power) {
+      ExecuteCommandPower(disp_device, POWER_OFF, SRC_DISPLAY);
+    }
+    if (renderer) renderer->dim(Settings.display_dimmer);
+  }
+  ResponseDisplayCmndNumber(Settings.display_dimmer);
+}
+
+void CmndDisplaySize(void)
+{
+  if ((XdrvMailbox.payload > 0) && (XdrvMailbox.payload <= 4)) {
+    Settings.display_size = XdrvMailbox.payload;
+  }
+  ResponseDisplayCmndNumber(Settings.display_size);
+}
+
+void CmndDisplayFont(void)
+{
+  if ((XdrvMailbox.payload > 0) && (XdrvMailbox.payload <= 4)) {
+    Settings.display_font = XdrvMailbox.payload;
+  }
+  ResponseDisplayCmndNumber(Settings.display_font);
+}
+
+void CmndDisplayRotate(void)
+{
+  if ((XdrvMailbox.payload >= 0) && (XdrvMailbox.payload < 4)) {
+    if (Settings.display_rotate != XdrvMailbox.payload) {
+/*
+      // Needs font info regarding height and width
+      if ((Settings.display_rotate &1) != (XdrvMailbox.payload &1)) {
+        uint8_t temp_rows = Settings.display_rows;
+        Settings.display_rows = Settings.display_cols[0];
+        Settings.display_cols[0] = temp_rows;
+#ifdef USE_DISPLAY_MODES1TO5
         DisplayReAllocScreenBuffer();
 #endif  // USE_DISPLAY_MODES1TO5
       }
-      Response_P(S_JSON_DISPLAY_COMMAND_NVALUE, command, Settings.display_rows);
+*/
+      Settings.display_rotate = XdrvMailbox.payload;
+      DisplayInit(DISPLAY_INIT_MODE);
+#ifdef USE_DISPLAY_MODES1TO5
+      DisplayLogBufferInit();
+#endif  // USE_DISPLAY_MODES1TO5
     }
-    else serviced = false;  // Unknown command
   }
-  else serviced = false;  // Unknown command
-
-  return serviced;
+  ResponseDisplayCmndNumber(Settings.display_rotate);
 }
+
+void CmndDisplayText(void)
+{
+  if (disp_device && XdrvMailbox.data_len > 0) {
+#ifndef USE_DISPLAY_MODES1TO5
+    DisplayText();
+#else
+    if (!Settings.display_mode) {
+      DisplayText();
+    } else {
+      DisplayLogBufferAdd(XdrvMailbox.data);
+    }
+#endif  // USE_DISPLAY_MODES1TO5
+    Response_P("{\"" D_CMND_DISPLAY "%s\":\"%s\"}", XdrvMailbox.command, XdrvMailbox.data);
+  }
+}
+
+void CmndDisplayAddress(void)
+{
+  if ((XdrvMailbox.index > 0) && (XdrvMailbox.index <= 8)) {
+    if ((XdrvMailbox.payload >= 0) && (XdrvMailbox.payload <= 255)) {
+      Settings.display_address[XdrvMailbox.index -1] = XdrvMailbox.payload;
+    }
+    ResponseDisplayCmndIdxNumber(Settings.display_address[XdrvMailbox.index -1]);
+  }
+}
+
+void CmndDisplayRefresh(void)
+{
+  if ((XdrvMailbox.payload >= 1) && (XdrvMailbox.payload <= 7)) {
+    Settings.display_refresh = XdrvMailbox.payload;
+  }
+  ResponseDisplayCmndNumber(Settings.display_refresh);
+}
+
+void CmndDisplayColumns(void)
+{
+  if ((XdrvMailbox.index > 0) && (XdrvMailbox.index <= 2)) {
+    if ((XdrvMailbox.payload > 0) && (XdrvMailbox.payload <= DISPLAY_MAX_COLS)) {
+      Settings.display_cols[XdrvMailbox.index -1] = XdrvMailbox.payload;
+#ifdef USE_DISPLAY_MODES1TO5
+      if (1 == XdrvMailbox.index) {
+        DisplayLogBufferInit();
+        DisplayReAllocScreenBuffer();
+      }
+#endif  // USE_DISPLAY_MODES1TO5
+    }
+    ResponseDisplayCmndIdxNumber(Settings.display_cols[XdrvMailbox.index -1]);
+  }
+}
+
+void CmndDisplayRows(void)
+{
+  if ((XdrvMailbox.payload > 0) && (XdrvMailbox.payload <= DISPLAY_MAX_ROWS)) {
+    Settings.display_rows = XdrvMailbox.payload;
+#ifdef USE_DISPLAY_MODES1TO5
+    DisplayLogBufferInit();
+    DisplayReAllocScreenBuffer();
+#endif  // USE_DISPLAY_MODES1TO5
+  }
+  ResponseDisplayCmndNumber(Settings.display_rows);
+}
+
 
 /*********************************************************************************************\
  * optional drivers
@@ -1945,7 +1970,10 @@ bool Xdrv13(uint8_t function)
         if (Settings.display_model) { XdspCall(FUNC_DISPLAY_EVERY_50_MSECOND); }
         break;
       case FUNC_COMMAND:
-        result = DisplayCommand();
+        if (!strncasecmp_P(XdrvMailbox.topic, PSTR(D_CMND_DISPLAY), strlen(D_CMND_DISPLAY))) {  // Prefix
+          XdrvMailbox.topic += strlen(D_CMND_DISPLAY);
+          result = DecodeCommand(kDisplayCommands, DisplayCommand);
+        }
         break;
       case FUNC_SET_POWER:
         DisplaySetPower();
