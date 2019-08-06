@@ -1209,6 +1209,25 @@ chknext:
           }
           goto strexit;
         }
+        if (!strncmp(vname,"hsrgb(",6)) {
+          lp=GetNumericResult(lp+6,OPER_EQU,&fvar,0);
+          if (fvar<0 || fvar>360) fvar=0;
+          SCRIPT_SKIP_SPACES
+          // arg2
+          float fvar2;
+          lp=GetNumericResult(lp,OPER_EQU,&fvar2,0);
+          if (fvar2<0 || fvar2>100) fvar2=0;
+
+          LightStateClass light_state = LightStateClass();
+          uint8_t r,g,b;
+          light_state.HsToRgb(fvar,fvar2,&r,&g,&b);
+          uint32_t res=(r<<16)|(g<<8)|b;
+          fvar=res;
+          lp++;
+          len=0;
+          goto exit;
+        }
+
         break;
       case 'i':
         if (!strncmp(vname,"int(",4)) {
