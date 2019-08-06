@@ -2601,8 +2601,9 @@ bool JsonWebColor(const char* dataBuf)
 }
 
 #define D_CMND_SENDMAIL "sendmail"
+#define D_JSON_MEMORY_ERROR "memory error"
 
-const char kWebSendStatus[] PROGMEM = D_JSON_DONE "|" D_JSON_WRONG_PARAMETERS "|" D_JSON_CONNECT_FAILED "|" D_JSON_HOST_NOT_FOUND ;
+const char kWebSendStatus[] PROGMEM = D_JSON_DONE "|" D_JSON_WRONG_PARAMETERS "|" D_JSON_CONNECT_FAILED "|" D_JSON_HOST_NOT_FOUND "|" D_JSON_MEMORY_ERROR;
 
 const char kWebCommands[] PROGMEM =
 #ifdef USE_EMULATION
