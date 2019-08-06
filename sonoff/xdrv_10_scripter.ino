@@ -199,8 +199,6 @@ void RulesTeleperiod(void) {
   if (bitRead(Settings.rule_enabled, 0) && mqtt_data[0]) Run_Scripter(">T",2, mqtt_data);
 }
 
-//#define USE_24C256
-
 // EEPROM MACROS
 #ifdef USE_24C256
 #ifndef USE_SCRIPT_FATFS

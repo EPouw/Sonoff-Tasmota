@@ -1323,6 +1323,19 @@ struct MORITZ *mp;
 }
 #endif
 
+#ifdef USE_24C256
+  // i2c eeprom
+#include <Eeprom24C128_256.h>
+#define EEPROM_ADDRESS 0x50
+#define EEPROM_START_OFFSET 16384
+static Eeprom24C128_256 m_eeprom(EEPROM_ADDRESS);
+// eeprom.writeBytes(address, length, buffer);
+#define EEP_WRITE(A,B,C) m_eeprom.writeBytes(A,B,(uint8_t*)C);
+// eeprom.readBytes(address, length, buffer);
+#define EEP_READ(A,B,C) m_eeprom.readBytes(A,B,(uint8_t*)C);
+#endif
+
+
 void CC1101_Detect() {
 uint8_t spi_set=0;
 
@@ -1350,15 +1363,6 @@ uint8_t spi_set=0;
   last_moritz_task=millis();
 
 #ifdef USE_24C256
-  // i2c eeprom
-#include <Eeprom24C128_256.h>
-#define EEPROM_ADDRESS 0x50
-#define EEPROM_START_OFFSET 16384
-Eeprom24C128_256 eeprom(EEPROM_ADDRESS);
-// eeprom.writeBytes(address, length, buffer);
-#define EEP_WRITE(A,B,C) eeprom.writeBytes(A,B,(uint8_t*)C);
-// eeprom.readBytes(address, length, buffer);
-#define EEP_READ(A,B,C) eeprom.readBytes(A,B,(uint8_t*)C);
   if (i2c_flg) {
     if (I2cDevice(EEPROM_ADDRESS)) {
       // eeprom is present
@@ -1367,6 +1371,7 @@ Eeprom24C128_256 eeprom(EEPROM_ADDRESS);
   }
 #endif
 }
+
 
 #ifdef USE_24C256
 
