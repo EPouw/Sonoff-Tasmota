@@ -109,7 +109,6 @@ struct M_FILT {
   float rbuff[1];
 };
 
-
 typedef union {
   uint8_t data;
   struct {
