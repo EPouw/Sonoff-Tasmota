@@ -48,7 +48,7 @@ o = switch display off
 O = switch display on  
 ax = x 0..3 set rotation angle
 t = display Tasmota time in HH:MM  
-ts = display Tasmota time in HH:MM:SS  
+tS = display Tasmota time in HH:MM:SS  
 T = display Tasmota date in DD.MM.YY  
 p*p =* pad text with spaces, positiv values align left, negativ values
 align right  

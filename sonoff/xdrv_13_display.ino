@@ -617,7 +617,7 @@ void DisplayText(void)
             break;
 
           case 't':
-            if (*cp=='s') {
+            if (*cp=='S') {
               cp++;
               if (dp < (linebuf + DISPLAY_BUFFER_COLS) -8) {
                 snprintf_P(dp, 9, PSTR("%02d" D_HOUR_MINUTE_SEPARATOR "%02d" D_MINUTE_SECOND_SEPARATOR "%02d"), RtcTime.hour, RtcTime.minute, RtcTime.second);
