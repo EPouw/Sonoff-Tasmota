@@ -28,7 +28,7 @@
 // keyfob expires after N seconds
 #define IB_TIMEOUT 60
 
-uint8_t hm17_found,hm17_cmd,hm17_debug=1,hm_17_flag;
+uint8_t hm17_found,hm17_cmd,hm17_debug=0,hm_17_flag;
 
 // 78 is max serial response
 #define HM17_BSIZ 128
@@ -82,6 +82,7 @@ void hm17_every_second(void) {
         ibeacons[cnt].TIME++;
         if (ibeacons[cnt].TIME>IB_TIMEOUT) {
           ibeacons[cnt].FLAGS=0;
+          ibeacon_mqtt(ibeacons[cnt].MAC,"0000");
         }
       }
     }
@@ -133,9 +134,9 @@ void hm17_sendcmd(uint8_t cmd) {
   }
 }
 
-void ibeacon_add(struct IBEACON *ib) {
+uint32_t ibeacon_add(struct IBEACON *ib) {
   // keyfob starts with ffff
-  if (strncmp(ib->MAC,"FFFF",4)) return;
+  if (strncmp(ib->MAC,"FFFF",4)) return 0;
 
   for (uint32_t cnt=0;cnt<MAX_IBEACONS;cnt++) {
     if (!ibeacons[cnt].FLAGS) break;
@@ -143,7 +144,7 @@ void ibeacon_add(struct IBEACON *ib) {
       // exists
       memcpy(ibeacons[cnt].RSSI,ib->RSSI,4);
       ibeacons[cnt].TIME=0;
-      return;
+      return 1;
     }
   }
   for (uint32_t cnt=0;cnt<MAX_IBEACONS;cnt++) {
@@ -152,9 +153,10 @@ void ibeacon_add(struct IBEACON *ib) {
       memcpy(ibeacons[cnt].RSSI,ib->RSSI,4);
       ibeacons[cnt].FLAGS=1;
       ibeacons[cnt].TIME=0;
-      return;
+      return 1;
     }
   }
+  return 0;
 }
 
 
@@ -280,7 +282,9 @@ void hm17_decode(void) {
             memcpy(ib.RSSI,&hm17_sbuffer[8+8+1+32+1+4+4+2+1+12+1],4);
 
             //if (strncmp(ib.FACID,"00000000",8)) {
-              ibeacon_add(&ib);
+              if (ibeacon_add(&ib)) {
+                ibeacon_mqtt(ib.MAC,ib.RSSI);
+              }
             //}
             hm17_sbclr();
             hm17_result=1;
@@ -379,6 +383,20 @@ bool XSNS_92_cmd(void) {
   }
   return serviced;
 }
+
+void ibeacon_mqtt(const char *mac,const char *rssi) {
+  char s_mac[14];
+  char s_rssi[6];
+  memcpy(s_mac,mac,12);
+  s_mac[12]=0;
+  memcpy(s_rssi,rssi,4);
+  s_rssi[4]=0;
+  int16_t n_rssi=atoi(s_rssi);
+  Response_P(PSTR("{\"" D_JSON_TIME "\":\"%s\""), GetDateAndTime(DT_LOCAL).c_str());
+  ResponseAppend_P(PSTR(",\"IBEACON_%s\":{\"RSSI\":%d}}"),s_mac,n_rssi);
+  MqttPublishPrefixTopic_P(TELE, PSTR(D_RSLT_SENSOR), Settings.flag.mqtt_sensor_retain);
+}
+
 
 /*********************************************************************************************\
  * Interface
