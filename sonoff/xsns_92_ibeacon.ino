@@ -26,7 +26,7 @@
 #define HM17_BAUDRATE 9600
 
 // keyfob expires after N seconds
-#define IB_TIMEOUT 60
+#define IB_TIMEOUT 30
 
 uint8_t hm17_found,hm17_cmd,hm17_debug=0,hm_17_flag;
 
@@ -34,7 +34,7 @@ uint8_t hm17_found,hm17_cmd,hm17_debug=0,hm_17_flag;
 #define HM17_BSIZ 128
 char hm17_sbuffer[HM17_BSIZ];
 uint8_t hm17_sindex,hm17_result;
-uint32_t hm17_lastms,upd_interval;
+uint32_t hm17_lastms,upd_interval,tout_interval;
 
 enum {HM17_TEST,HM17_ROLE,HM17_IMME,HM17_DISI,HM17_IBEA,HM17_SCAN,HM17_DISC,HM17_RESET,HM17_RENEW};
 #define HM17_SUCESS 99
@@ -65,6 +65,7 @@ void IBEACON_Init() {
   hm17_sendcmd(HM17_TEST);
   hm17_lastms=millis();
   upd_interval=IB_UPDATE_TIME;
+  tout_interval=IB_TIMEOUT;
 }
 
 void hm17_every_second(void) {
@@ -80,7 +81,7 @@ void hm17_every_second(void) {
     for (uint32_t cnt=0;cnt<MAX_IBEACONS;cnt++) {
       if (ibeacons[cnt].FLAGS) {
         ibeacons[cnt].TIME++;
-        if (ibeacons[cnt].TIME>IB_TIMEOUT) {
+        if (ibeacons[cnt].TIME>tout_interval) {
           ibeacons[cnt].FLAGS=0;
           ibeacon_mqtt(ibeacons[cnt].MAC,"0000");
         }
@@ -349,7 +350,14 @@ char rssi[6];
 }
 #endif  // USE_WEBSERVER
 
-
+/*
+commands sensor92
+uT = sets update interval in seconds (scan tags every T seonds)
+tT = sets timeout interval in seconds (after T seconds if tag is not detected send rssi=0)
+c  = clears sensor list
+s AT+xxx  = send native cmds to module
+e.g. s AT+CONFFFF3D1B1E9D connects to module with ID, then send s AT to disconnect which activates the beeper in the TAG 
+*/
 bool XSNS_92_cmd(void) {
   bool serviced = true;
   const char S_JSON_IBEACON[] = "{\"" D_CMND_SENSOR "%d\":%s:%d}";
@@ -374,6 +382,10 @@ bool XSNS_92_cmd(void) {
         cp++;
         if (*cp) upd_interval=atoi(cp);
         snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON, XSNS_92,"uintv",upd_interval);
+      } else if (*cp=='t') {
+        cp++;
+        if (*cp) tout_interval=atoi(cp);
+        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON, XSNS_92,"lintv",tout_interval);
       } else if (*cp=='c') {
         for (uint32_t cnt=0;cnt<MAX_IBEACONS;cnt++) ibeacons[cnt].FLAGS=0;
         snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON1, XSNS_92,"clr list","");
