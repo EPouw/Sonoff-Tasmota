@@ -354,10 +354,16 @@ char rssi[6];
 commands sensor92
 uT = sets update interval in seconds (scan tags every T seonds)
 tT = sets timeout interval in seconds (after T seconds if tag is not detected send rssi=0)
+dx = sets debug mode to 0,1
 c  = clears sensor list
 s AT+xxx  = send native cmds to module
-e.g. s AT+CONFFFF3D1B1E9D connects to module with ID, then send s AT to disconnect which activates the beeper in the TAG 
+e.g. s AT+CONFFFF3D1B1E9D connects to module with ID, then send s AT to disconnect which activates the beeper in the TAG
+
+sending IBEACON_FFFF3D1B1E9D_RSSI with data 99 causes tag to beep (ID to be replaced with actual ID)
 */
+
+
+
 bool XSNS_92_cmd(void) {
   bool serviced = true;
   const char S_JSON_IBEACON[] = "{\"" D_CMND_SENSOR "%d\":%s:%d}";
@@ -389,12 +395,42 @@ bool XSNS_92_cmd(void) {
       } else if (*cp=='c') {
         for (uint32_t cnt=0;cnt<MAX_IBEACONS;cnt++) ibeacons[cnt].FLAGS=0;
         snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON1, XSNS_92,"clr list","");
+      } else if (*cp=='d') {
+        cp++;
+        if (*cp) hm17_debug=atoi(cp);
+        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON, XSNS_92,"debug",hm17_debug);
       }
   } else {
     serviced=false;
   }
   return serviced;
 }
+
+#define D_CMND_IBEACON "IBEACON"
+//"IBEACON_FFFF3D1B1E9D_RSSI", Data "99" causes TAG to beep
+bool ibeacon_cmd(void) {
+  char mac[16];
+  mac[0]=0;
+  int16_t rssi=0;
+  const char S_JSON_IBEACON[] = "{\"" D_CMND_IBEACON "_%s\":%d}";
+  uint8_t cmd_len = strlen(D_CMND_IBEACON);
+  if (!strncasecmp_P(XdrvMailbox.topic, PSTR(D_CMND_IBEACON), cmd_len)) {
+    // IBEACON prefix
+    rssi = XdrvMailbox.payload;
+    if (rssi==99) {
+      memcpy(mac,XdrvMailbox.topic+cmd_len+1,12);
+      mac[12]=0;
+      Serial.write((const uint8_t*)"AT+CON",6);
+      Serial.write((const uint8_t*)mac,12);
+      delay(500);
+      hm17_sendcmd(0);
+    }
+    snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON,mac,rssi);
+    return true;
+  }
+  return false;
+}
+
 
 void ibeacon_mqtt(const char *mac,const char *rssi) {
   char s_mac[14];
@@ -405,7 +441,7 @@ void ibeacon_mqtt(const char *mac,const char *rssi) {
   s_rssi[4]=0;
   int16_t n_rssi=atoi(s_rssi);
   Response_P(PSTR("{\"" D_JSON_TIME "\":\"%s\""), GetDateAndTime(DT_LOCAL).c_str());
-  ResponseAppend_P(PSTR(",\"IBEACON_%s\":{\"RSSI\":%d}}"),s_mac,n_rssi);
+  ResponseAppend_P(PSTR(",\"" D_CMND_IBEACON "_%s\":{\"RSSI\":%d}}"),s_mac,n_rssi);
   MqttPublishPrefixTopic_P(TELE, PSTR(D_RSLT_SENSOR), Settings.flag.mqtt_sensor_retain);
 }
 
@@ -432,6 +468,9 @@ bool Xsns92(byte function)
         if (XSNS_92 == XdrvMailbox.index) {
           result = XSNS_92_cmd();
         }
+        break;
+      case FUNC_COMMAND:
+        result=ibeacon_cmd();
         break;
 #ifdef USE_WEBSERVER
       case FUNC_WEB_SENSOR:
