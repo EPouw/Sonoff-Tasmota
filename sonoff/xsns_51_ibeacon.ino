@@ -84,9 +84,7 @@ void IBEACON_Init() {
     if (IBEACON_Serial->begin(HM17_BAUDRATE)) {
       if (IBEACON_Serial->hardwareSerial()) {
         ClaimSerial();
-        AddLog_P2(LOG_LEVEL_INFO, PSTR("hardware serial"));
       }
-      AddLog_P2(LOG_LEVEL_INFO, PSTR(" serial init"));
       hm17_sendcmd(HM17_TEST);
       hm17_lastms=millis();
       // in case of using Settings this has to be moved
@@ -99,7 +97,7 @@ void IBEACON_Init() {
 void hm17_every_second(void) {
   if (hm17_found) {
     if (IB_UPDATE_TIME && (uptime%IB_UPDATE_TIME==0)) {
-      if (hm17_cmd!=99) {
+      if (hm17_cmd!=99 && !hm17_scanning) {
         if (hm17_flag&2) {
           ib_sendbeep();
         } else {
@@ -269,6 +267,7 @@ void hm17_decode(void) {
       if (!strncmp(hm17_sbuffer,"OK+CONNA",8)) {
         hm17_sbclr();
         if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("CONNA OK"));
+        hm17_connecting=2;
         break;
       }
       if (!strncmp(hm17_sbuffer,"OK+CONNE",8)) {
@@ -281,11 +280,10 @@ void hm17_decode(void) {
         if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("CONNF ERROR"));
         break;
       }
-      if (!strncmp(hm17_sbuffer,"OK+CONN",7)) {
+      if (hm17_connecting==2 && !strncmp(hm17_sbuffer,"OK+CONN",7)) {
         hm17_sbclr();
         if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("CONN OK"));
-        hm17_connecting=2;
-        delay(1000);
+        hm17_connecting=3;
         hm17_sendcmd(HM17_TEST);
         hm17_connecting=0;
         break;
@@ -308,18 +306,6 @@ void hm17_decode(void) {
         break;
       }
       if (!strncmp(hm17_sbuffer,"OK+NAME:",8)) {
-        //if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("NAME OK"));
-        //if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR(">>%s"),&hm17_sbuffer[8]);
-        /*
-        char hbuff[512];
-        char *cp=hbuff;
-        for (uint16_t cnt=0;cnt<hm17_sindex;cnt++) {
-          sprintf(cp,"%s%02X",cp,hm17_sbuffer[cnt]);
-        }
-        if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR(">>%s"),hbuff);
-        */
-        //if ((hm17_sbuffer[hm17_sindex]==0x0a) && (hm17_sbuffer[hm17_sindex-1]==0x0d)) {
-
         if (hm17_sbuffer[hm17_sindex-1]=='\n') {
           hm17_result=HM17_SUCESS;
           if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("NAME OK"));
@@ -351,11 +337,9 @@ void hm17_decode(void) {
             memcpy(ib.MAC,&hm17_sbuffer[8+8+1+32+1+4+4+2+1],12);
             memcpy(ib.RSSI,&hm17_sbuffer[8+8+1+32+1+4+4+2+1+12+1],4);
 
-            //if (strncmp(ib.FACID,"00000000",8)) {
-              if (ibeacon_add(&ib)) {
-                ibeacon_mqtt(ib.MAC,ib.RSSI);
-              }
-            //}
+            if (ibeacon_add(&ib)) {
+              ibeacon_mqtt(ib.MAC,ib.RSSI);
+            }
             hm17_sbclr();
             hm17_result=1;
           }
@@ -364,12 +348,6 @@ void hm17_decode(void) {
         }
         break;
       }
-      /*
-      if (!strncmp(hm17_sbuffer,"OK+DISC",7)) {
-        if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR(">>%s"),&hm17_sbuffer[8]);
-        break;
-      }*/
-
   }
 }
 
@@ -421,20 +399,21 @@ char rssi[6];
 #endif  // USE_WEBSERVER
 
 /*
-commands sensor92
+commands sensor51
 to initialyze hm17 the cmds
-sensor92 1
-sensor92 2
+sensor51 1
+sensor51 2
 must be given only once (stored in module)
 
 uT = sets update interval in seconds (scan tags every T seonds) default=10
 tT = sets timeout interval in seconds (after T seconds if tag is not detected send rssi=0) default=30
+sending IBEACON_FFFF3D1B1E9D_RSSI with data 99 causes tag to beep (ID to be replaced with actual ID)
+
+*** debugging
 dx = sets debug mode to 0,1
 c  = clears sensor list
 s AT+xxx  = send native cmds to module
 e.g. s AT+CONFFFF3D1B1E9D connects to module with ID, then send s AT to disconnect which activates the beeper in the TAG
-
-sending IBEACON_FFFF3D1B1E9D_RSSI with data 99 causes tag to beep (ID to be replaced with actual ID)
 */
 
 

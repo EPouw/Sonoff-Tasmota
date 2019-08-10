@@ -223,6 +223,14 @@ bool (* const xsns_func_ptr[])(uint8_t) = {  // Sensor Function Pointers for sim
   &Xsns50,
 #endif
 
+#ifdef XSNS_51
+  &Xsns51,
+#endif
+
+#ifdef XSNS_52
+  &Xsns52,
+#endif
+
 // Optional user defined sensors in range 91 - 99
 
 #ifdef XSNS_91

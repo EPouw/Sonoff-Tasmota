@@ -187,6 +187,10 @@ enum UserSelectablePins {
   GPIO_BUZZER,         // Buzzer
   GPIO_BUZZER_INV,     // Inverted buzzer
   GPIO_OLED_RESET,     // OLED Display Reset
+  GPIO_SOLAXX1_TX,     // Solax Inverter tx pin
+  GPIO_SOLAXX1_RX,     // Solax Inverter rx pin
+  GPIO_ZIGBEE_TX,      // Zigbee Serial interface
+  GPIO_ZIGBEE_RX,      // Zigbee Serial interface
   GPIO_IBEACON_TX,     // HM17 IBEACON TX
   GPIO_IBEACON_RX,     // HM17 IBEACON RX
   GPIO_RDM6300_RX,     // RDM6300 RX
