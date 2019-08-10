@@ -98,7 +98,8 @@ void IBEACON_Init() {
 void hm17_every_second(void) {
   if (hm17_found) {
     if (IB_UPDATE_TIME && (uptime%IB_UPDATE_TIME==0)) {
-      if (hm17_cmd!=99 && !hm17_scanning) {
+      //if (hm17_cmd!=99 && !hm17_scanning) {
+      if (hm17_cmd!=99) {
         if (hm17_flag&2) {
           ib_sendbeep();
         } else {
