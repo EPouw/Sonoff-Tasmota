@@ -39,6 +39,7 @@ uint8_t moritz_ready = 0;
 uint8_t moritz_on;
 uint8_t moritz_flags;
 uint8_t moritz_addr[3];
+uint8_t moritz_cs;
 
 #define MORITZ_SHOW_ALL 1
 #define MORITZ_PAIR_ENABLE 2
@@ -60,6 +61,7 @@ void set_ccon(void);
 void new_moritz(const char *hid,uint8_t type,uint8_t bs,uint8_t rfe,uint8_t bl,uint8_t rssi,uint8_t dtmp,uint16_t mtmp, uint8_t valve, uint8_t tmode);
 
 uint8_t cc_on;
+
 
 // max label size = 28
 /*
@@ -231,8 +233,8 @@ typedef enum {
 
 
 
-#define CC1100_DEASSERT  	digitalWrite(CC100_CS,1);SPI.endTransaction();
-#define CC1100_ASSERT    	SPI.beginTransaction(moritz_spiSettings);digitalWrite( CC100_CS,0)
+#define CC1100_DEASSERT  	digitalWrite(moritz_cs,1);SPI.endTransaction();
+#define CC1100_ASSERT    	SPI.beginTransaction(moritz_spiSettings);digitalWrite( moritz_cs,0)
 
 //#define CC1100_SET_OUT		CC1100_OUT_PORT |= _BV(CC1100_OUT_PIN)
 //#define CC1100_CLEAR_OUT	CC1100_OUT_PORT &= ~_BV(CC1100_OUT_PIN)
@@ -1335,6 +1337,9 @@ static Eeprom24C128_256 m_eeprom(EEPROM_ADDRESS);
 #define EEP_READ(A,B,C) m_eeprom.readBytes(A,B,(uint8_t*)C);
 #endif
 
+void Moritz_Init(void) {
+  moritz_cs=CC100_CS;
+}
 
 void CC1101_Detect() {
 uint8_t spi_set=0;
@@ -1350,8 +1355,15 @@ uint8_t spi_set=0;
   }
   if (!spi_set) return;
 
-  pinMode(CC100_CS, OUTPUT);
-  digitalWrite(CC100_CS,1);
+  if (pin[GPIO_CC1101_CS]<99) {
+    moritz_cs=pin[GPIO_CC1101_CS];
+  }
+
+  pinMode(moritz_cs, OUTPUT);
+  digitalWrite(moritz_cs,1);
+
+  pinMode(moritz_cs, OUTPUT);
+  digitalWrite(moritz_cs,1);
   SPI.begin();
   moritz_spiSettings = SPISettings(5000000, MSBFIRST, SPI_MODE3);
   rf_moritz_init();
@@ -1605,8 +1617,7 @@ bool Xsns97(byte function) {
 
   switch (function) {
       case FUNC_MODULE_INIT:
-        pinMode(CC100_CS, OUTPUT);
-        digitalWrite(CC100_CS,1);
+        Moritz_Init();
         break;
       case FUNC_INIT:
         CC1101_Detect();

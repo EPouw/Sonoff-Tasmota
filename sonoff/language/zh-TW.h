@@ -590,6 +590,7 @@
 #define D_SENSOR_IBEACON_TX    "iBeacon TX"
 #define D_SENSOR_IBEACON_RX    "iBeacon RX"
 #define D_SENSOR_RDM6300_RX    "RDM6300 RX"
+#define D_SENSOR_CC1101_CS     "CC1101 CS"
 
 // Units
 #define D_UNIT_AMPERE "安"

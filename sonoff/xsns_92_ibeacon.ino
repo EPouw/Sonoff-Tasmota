@@ -23,10 +23,15 @@
 
 #define XSNS_92                          92
 
+#include <TasmotaSerial.h>
+
 #define HM17_BAUDRATE 9600
 
 // keyfob expires after N seconds
 #define IB_TIMEOUT_INTERVAL 30
+
+TasmotaSerial *IBEACON_Serial = nullptr;
+
 
 uint8_t hm17_found,hm17_cmd,hm17_debug=0,hm17_flag;
 
@@ -71,13 +76,24 @@ struct IBEACON_UID {
 
 
 void IBEACON_Init() {
-  ClaimSerial();
-  SetSerialBaudrate(HM17_BAUDRATE);
-  hm17_sendcmd(HM17_TEST);
-  hm17_lastms=millis();
-  // in case of using Settings this has to be moved
-  IB_UPDATE_TIME=IB_UPDATE_TIME_INTERVAL;
-  IB_TIMEOUT_TIME=IB_TIMEOUT_INTERVAL;
+
+  hm17_found=0;
+
+  if ((pin[GPIO_IBEACON_RX] < 99) && (pin[GPIO_IBEACON_TX] < 99)) {
+    IBEACON_Serial = new TasmotaSerial(pin[GPIO_IBEACON_RX], pin[GPIO_IBEACON_TX],1);
+    if (IBEACON_Serial->begin(HM17_BAUDRATE)) {
+      if (IBEACON_Serial->hardwareSerial()) {
+        ClaimSerial();
+        AddLog_P2(LOG_LEVEL_INFO, PSTR("hardware serial"));
+      }
+      AddLog_P2(LOG_LEVEL_INFO, PSTR(" serial init"));
+      hm17_sendcmd(HM17_TEST);
+      hm17_lastms=millis();
+      // in case of using Settings this has to be moved
+      IB_UPDATE_TIME=IB_UPDATE_TIME_INTERVAL;
+      IB_TIMEOUT_TIME=IB_TIMEOUT_INTERVAL;
+    }
+  }
 }
 
 void hm17_every_second(void) {
@@ -115,7 +131,7 @@ void hm17_every_second(void) {
 void hm17_sbclr(void) {
   memset(hm17_sbuffer,0,HM17_BSIZ);
   hm17_sindex=0;
-  Serial.flush();
+  IBEACON_Serial->flush();
 }
 
 void hm17_sendcmd(uint8_t cmd) {
@@ -124,37 +140,37 @@ void hm17_sendcmd(uint8_t cmd) {
   if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("hm17cmd %d"),cmd);
   switch (cmd) {
     case HM17_TEST:
-      Serial.write("AT");
+      IBEACON_Serial->write("AT");
       break;
     case HM17_ROLE:
-      Serial.write("AT+ROLE1");
+      IBEACON_Serial->write("AT+ROLE1");
       break;
     case HM17_IMME:
-      Serial.write("AT+IMME1");
+      IBEACON_Serial->write("AT+IMME1");
       break;
     case HM17_DISI:
-      Serial.write("AT+DISI?");
+      IBEACON_Serial->write("AT+DISI?");
       hm17_scanning=1;
       break;
     case HM17_IBEA:
-      Serial.write("AT+IBEA1");
+      IBEACON_Serial->write("AT+IBEA1");
       break;
     case HM17_RESET:
-      Serial.write("AT+RESET");
+      IBEACON_Serial->write("AT+RESET");
       break;
     case HM17_RENEW:
-      Serial.write("AT+RENEW");
+      IBEACON_Serial->write("AT+RENEW");
       break;
     case HM17_SCAN:
-      Serial.write("AT+SCAN5");
+      IBEACON_Serial->write("AT+SCAN5");
       break;
     case HM17_DISC:
-      Serial.write("AT+DISC?");
+      IBEACON_Serial->write("AT+DISC?");
       hm17_scanning=1;
       break;
     case HM17_CON:
-      Serial.write((const uint8_t*)"AT+CON",6);
-      Serial.write((const uint8_t*)ib_mac,12);
+      IBEACON_Serial->write((const uint8_t*)"AT+CON",6);
+      IBEACON_Serial->write((const uint8_t*)ib_mac,12);
       hm17_connecting=1;
       break;
   }
@@ -359,12 +375,13 @@ void hm17_decode(void) {
 
 void IBEACON_loop() {
 uint32_t difftime=millis()-hm17_lastms;
+  if (!IBEACON_Serial) return;
 
-  while (Serial.available()) {
+  while (IBEACON_Serial->available()) {
     hm17_lastms=millis();
     // shift in
     if (hm17_sindex<HM17_BSIZ) {
-      hm17_sbuffer[hm17_sindex]=Serial.read();
+      hm17_sbuffer[hm17_sindex]=IBEACON_Serial->read();
       hm17_sindex++;
       hm17_decode();
     } else {
@@ -439,7 +456,7 @@ bool XSNS_92_cmd(void) {
           len--;
           cp++;
         }
-        Serial.write((uint8_t*)cp,len);
+        IBEACON_Serial->write((uint8_t*)cp,len);
         hm17_cmd=99;
         snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON1, XSNS_92,"hm17cmd",cp);
       } else if (*cp=='u') {

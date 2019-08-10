@@ -36,8 +36,8 @@ TasmotaSerial *RDM6300_Serial = nullptr;
 
 void RDM6300_Init() {
   if (pin[GPIO_RDM6300_RX] < 99) {
-    RDM6300_Serial = new TasmotaSerial(pin[GPIO_RDM6300_RX],-1);
-    if (RDM6300_Serial->begin(RDM6300_BAUDRATE)) {  // Baud rate is stored div 1200 so it fits into one byte
+    RDM6300_Serial = new TasmotaSerial(pin[GPIO_RDM6300_RX],-1,1);
+    if (RDM6300_Serial->begin(RDM6300_BAUDRATE)) {
       if (RDM6300_Serial->hardwareSerial()) {
         ClaimSerial();
       }

@@ -190,6 +190,7 @@ enum UserSelectablePins {
   GPIO_IBEACON_TX,     // HM17 IBEACON TX
   GPIO_IBEACON_RX,     // HM17 IBEACON RX
   GPIO_RDM6300_RX,     // RDM6300 RX
+  GPIO_CC1101_CS,      // CC1101 CS
   GPIO_SENSOR_END };
 
 // Programmer selectable GPIO functionality
@@ -258,7 +259,7 @@ const char kSensorNames[] PROGMEM =
   D_SENSOR_LED_LINK "|" D_SENSOR_LED_LINK "i|"
   D_SENSOR_ARIRFSEL "|"
   D_SENSOR_BUZZER "|" D_SENSOR_BUZZER "i|"
-  D_SENSOR_OLED_RESET "|" D_SENSOR_IBEACON_TX "|" D_SENSOR_IBEACON_RX "|" D_SENSOR_RDM6300_RX "|"
+  D_SENSOR_OLED_RESET "|" D_SENSOR_IBEACON_TX "|" D_SENSOR_IBEACON_RX "|" D_SENSOR_RDM6300_RX "|" D_SENSOR_CC1101_CS "|"
   ;
 
 // User selectable ADC0 functionality
@@ -654,7 +655,10 @@ const uint8_t kGpioNiceList[] PROGMEM = {
 #endif
 #ifdef USE_IBEACON
   GPIO_IBEACON_RX,
-  GPIO_IBEACON_TX
+  GPIO_IBEACON_TX,
+#endif
+#ifdef USE_MORITZ
+  GPIO_CC1101_CS,
 #endif
 };
 
