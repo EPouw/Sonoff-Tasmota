@@ -587,6 +587,9 @@
 #define D_SENSOR_ADE7953_IRQ   "ADE7953 IRQ"
 #define D_SENSOR_BUZZER        "Зуммер"
 #define D_SENSOR_OLED_RESET    "OLED Reset"
+#define D_SENSOR_IBEACON_TX    "iBeacon TX"
+#define D_SENSOR_IBEACON_RX    "iBeacon RX"
+#define D_SENSOR_RDM6300_RX    "RDM6300 RX"
 
 // Units
 #define D_UNIT_AMPERE "А"

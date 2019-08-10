@@ -19,24 +19,35 @@
 
 #ifdef USE_IBEACON
 
-#define IB_UPDATE_TIME 10
+#define IB_UPDATE_TIME_INTERVAL 10
 
 #define XSNS_92                          92
 
 #define HM17_BAUDRATE 9600
 
 // keyfob expires after N seconds
-#define IB_TIMEOUT 30
+#define IB_TIMEOUT_INTERVAL 30
 
-uint8_t hm17_found,hm17_cmd,hm17_debug=0,hm_17_flag;
+uint8_t hm17_found,hm17_cmd,hm17_debug=0,hm17_flag;
 
 // 78 is max serial response
 #define HM17_BSIZ 128
 char hm17_sbuffer[HM17_BSIZ];
-uint8_t hm17_sindex,hm17_result;
-uint32_t hm17_lastms,upd_interval,tout_interval;
+uint8_t hm17_sindex,hm17_result,hm17_scanning,hm17_connecting;
+uint32_t hm17_lastms;
+char ib_mac[14];
 
-enum {HM17_TEST,HM17_ROLE,HM17_IMME,HM17_DISI,HM17_IBEA,HM17_SCAN,HM17_DISC,HM17_RESET,HM17_RENEW};
+// should be in Settings
+#if 1
+uint8_t ib_upd_interval,ib_tout_interval;
+#define IB_UPDATE_TIME ib_upd_interval
+#define IB_TIMEOUT_TIME ib_tout_interval
+#else
+#define IB_UPDATE_TIME Settings.ib_upd_interval
+#define IB_TIMEOUT_TIME Settings.ib_tout_interval
+#endif
+
+enum {HM17_TEST,HM17_ROLE,HM17_IMME,HM17_DISI,HM17_IBEA,HM17_SCAN,HM17_DISC,HM17_RESET,HM17_RENEW,HM17_CON};
 #define HM17_SUCESS 99
 
 struct IBEACON {
@@ -64,24 +75,31 @@ void IBEACON_Init() {
   SetSerialBaudrate(HM17_BAUDRATE);
   hm17_sendcmd(HM17_TEST);
   hm17_lastms=millis();
-  upd_interval=IB_UPDATE_TIME;
-  tout_interval=IB_TIMEOUT;
+  // in case of using Settings this has to be moved
+  IB_UPDATE_TIME=IB_UPDATE_TIME_INTERVAL;
+  IB_TIMEOUT_TIME=IB_TIMEOUT_INTERVAL;
 }
 
 void hm17_every_second(void) {
   if (hm17_found) {
-    if (upd_interval && (uptime%upd_interval==0)) {
+    if (IB_UPDATE_TIME && (uptime%IB_UPDATE_TIME==0)) {
       if (hm17_cmd!=99) {
-        hm17_sendcmd(HM17_DISI);
-        //if (hm_17_flag&1) hm17_sendcmd(HM17_DISI);
-        //else hm17_sendcmd(HM17_DISC);
-        //hm_17_flag^=1;
+        if (hm17_flag&2) {
+          ib_sendbeep();
+        } else {
+          if (!hm17_connecting) {
+            hm17_sendcmd(HM17_DISI);
+            //if (hm17_flag&1) hm17_sendcmd(HM17_DISI);
+            //else hm17_sendcmd(HM17_DISC);
+            //hm17_flag^=1;
+          }
+        }
       }
     }
     for (uint32_t cnt=0;cnt<MAX_IBEACONS;cnt++) {
       if (ibeacons[cnt].FLAGS) {
         ibeacons[cnt].TIME++;
-        if (ibeacons[cnt].TIME>tout_interval) {
+        if (ibeacons[cnt].TIME>IB_TIMEOUT_TIME) {
           ibeacons[cnt].FLAGS=0;
           ibeacon_mqtt(ibeacons[cnt].MAC,"0000");
         }
@@ -116,6 +134,7 @@ void hm17_sendcmd(uint8_t cmd) {
       break;
     case HM17_DISI:
       Serial.write("AT+DISI?");
+      hm17_scanning=1;
       break;
     case HM17_IBEA:
       Serial.write("AT+IBEA1");
@@ -131,6 +150,12 @@ void hm17_sendcmd(uint8_t cmd) {
       break;
     case HM17_DISC:
       Serial.write("AT+DISC?");
+      hm17_scanning=1;
+      break;
+    case HM17_CON:
+      Serial.write((const uint8_t*)"AT+CON",6);
+      Serial.write((const uint8_t*)ib_mac,12);
+      hm17_connecting=1;
       break;
   }
 }
@@ -224,6 +249,33 @@ void hm17_decode(void) {
         hm17_result=HM17_SUCESS;
       }
       break;
+    case HM17_CON:
+      if (!strncmp(hm17_sbuffer,"OK+CONNA",8)) {
+        hm17_sbclr();
+        if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("CONNA OK"));
+        break;
+      }
+      if (!strncmp(hm17_sbuffer,"OK+CONNE",8)) {
+        hm17_sbclr();
+        if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("CONNE ERROR"));
+        break;
+      }
+      if (!strncmp(hm17_sbuffer,"OK+CONNF",8)) {
+        hm17_sbclr();
+        if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("CONNF ERROR"));
+        break;
+      }
+      if (!strncmp(hm17_sbuffer,"OK+CONN",7)) {
+        hm17_sbclr();
+        if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("CONN OK"));
+        hm17_connecting=2;
+        delay(500);
+        hm17_sendcmd(HM17_TEST);
+        hm17_connecting=0;
+        break;
+      }
+      break;
+
     case HM17_DISI:
     case HM17_DISC:
       if (!strncmp(hm17_sbuffer,"OK+DISCS",8)) {
@@ -236,6 +288,7 @@ void hm17_decode(void) {
         hm17_sbclr();
         hm17_result=HM17_SUCESS;
         if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("DISCE OK"));
+        hm17_scanning=0;
         break;
       }
       if (!strncmp(hm17_sbuffer,"OK+NAME:",8)) {
@@ -352,8 +405,13 @@ char rssi[6];
 
 /*
 commands sensor92
-uT = sets update interval in seconds (scan tags every T seonds)
-tT = sets timeout interval in seconds (after T seconds if tag is not detected send rssi=0)
+to initialyze hm17 the cmds
+sensor92 1
+sensor92 2
+must be given only once (stored in module)
+
+uT = sets update interval in seconds (scan tags every T seonds) default=10
+tT = sets timeout interval in seconds (after T seconds if tag is not detected send rssi=0) default=30
 dx = sets debug mode to 0,1
 c  = clears sensor list
 s AT+xxx  = send native cmds to module
@@ -386,12 +444,12 @@ bool XSNS_92_cmd(void) {
         snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON1, XSNS_92,"hm17cmd",cp);
       } else if (*cp=='u') {
         cp++;
-        if (*cp) upd_interval=atoi(cp);
-        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON, XSNS_92,"uintv",upd_interval);
+        if (*cp) IB_UPDATE_TIME=atoi(cp);
+        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON, XSNS_92,"uintv",IB_UPDATE_TIME);
       } else if (*cp=='t') {
         cp++;
-        if (*cp) tout_interval=atoi(cp);
-        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON, XSNS_92,"lintv",tout_interval);
+        if (*cp) IB_TIMEOUT_TIME=atoi(cp);
+        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON, XSNS_92,"lintv",IB_TIMEOUT_TIME);
       } else if (*cp=='c') {
         for (uint32_t cnt=0;cnt<MAX_IBEACONS;cnt++) ibeacons[cnt].FLAGS=0;
         snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON1, XSNS_92,"clr list","");
@@ -409,28 +467,33 @@ bool XSNS_92_cmd(void) {
 #define D_CMND_IBEACON "IBEACON"
 //"IBEACON_FFFF3D1B1E9D_RSSI", Data "99" causes TAG to beep
 bool ibeacon_cmd(void) {
-  char mac[16];
-  mac[0]=0;
+  ib_mac[0]=0;
   int16_t rssi=0;
-  const char S_JSON_IBEACON[] = "{\"" D_CMND_IBEACON "_%s\":%d}";
+  const char S_JSON_IBEACON[] = "{\"" D_CMND_IBEACON "_%s_RSSI\":%d}";
   uint8_t cmd_len = strlen(D_CMND_IBEACON);
   if (!strncasecmp_P(XdrvMailbox.topic, PSTR(D_CMND_IBEACON), cmd_len)) {
     // IBEACON prefix
     rssi = XdrvMailbox.payload;
     if (rssi==99) {
-      memcpy(mac,XdrvMailbox.topic+cmd_len+1,12);
-      mac[12]=0;
-      Serial.write((const uint8_t*)"AT+CON",6);
-      Serial.write((const uint8_t*)mac,12);
-      delay(500);
-      hm17_sendcmd(0);
+      memcpy(ib_mac,XdrvMailbox.topic+cmd_len+1,12);
+      ib_mac[12]=0;
+      if (hm17_scanning) {
+        // postpone sendbeep
+        hm17_flag|=2;
+      } else {
+        ib_sendbeep();
+      }
     }
-    snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON,mac,rssi);
+    snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON,ib_mac,rssi);
     return true;
   }
   return false;
 }
 
+void ib_sendbeep(void) {
+  hm17_flag=0;
+  hm17_sendcmd(HM17_CON);
+}
 
 void ibeacon_mqtt(const char *mac,const char *rssi) {
   char s_mac[14];

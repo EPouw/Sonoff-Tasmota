@@ -187,6 +187,9 @@ enum UserSelectablePins {
   GPIO_BUZZER,         // Buzzer
   GPIO_BUZZER_INV,     // Inverted buzzer
   GPIO_OLED_RESET,     // OLED Display Reset
+  GPIO_IBEACON_TX,     // HM17 IBEACON TX
+  GPIO_IBEACON_RX,     // HM17 IBEACON RX
+  GPIO_RDM6300_RX,     // RDM6300 RX
   GPIO_SENSOR_END };
 
 // Programmer selectable GPIO functionality
@@ -255,7 +258,7 @@ const char kSensorNames[] PROGMEM =
   D_SENSOR_LED_LINK "|" D_SENSOR_LED_LINK "i|"
   D_SENSOR_ARIRFSEL "|"
   D_SENSOR_BUZZER "|" D_SENSOR_BUZZER "i|"
-  D_SENSOR_OLED_RESET "|"
+  D_SENSOR_OLED_RESET "|" D_SENSOR_IBEACON_TX "|" D_SENSOR_IBEACON_RX "|" D_SENSOR_RDM6300_RX "|"
   ;
 
 // User selectable ADC0 functionality
@@ -644,7 +647,14 @@ const uint8_t kGpioNiceList[] PROGMEM = {
 #endif
 #ifdef USE_HRE
   GPIO_HRE_CLOCK,
-  GPIO_HRE_DATA
+  GPIO_HRE_DATA,
+#endif
+#ifdef USE_RDM6300
+  GPIO_RDM6300_RX,
+#endif
+#ifdef USE_IBEACON
+  GPIO_IBEACON_RX,
+  GPIO_IBEACON_TX
 #endif
 };
 

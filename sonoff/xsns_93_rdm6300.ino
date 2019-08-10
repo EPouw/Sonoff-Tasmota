@@ -23,18 +23,26 @@
 
 #define RDM6300_BAUDRATE 9600
 
+#include <TasmotaSerial.h>
+
 #define RDM_TIMEOUT 100
 char rdm_uid_str[10];
 
 // 2 seconds block time
 #define RDM6300_BLOCK 2*10
 
-char rdm_blcnt;
+uint8_t rdm_blcnt;
+TasmotaSerial *RDM6300_Serial = nullptr;
 
 void RDM6300_Init() {
-  // currently uses RX pin, may also be software serial in the future
-  ClaimSerial();
-  SetSerialBaudrate(RDM6300_BAUDRATE);
+  if (pin[GPIO_RDM6300_RX] < 99) {
+    RDM6300_Serial = new TasmotaSerial(pin[GPIO_RDM6300_RX],-1);
+    if (RDM6300_Serial->begin(RDM6300_BAUDRATE)) {  // Baud rate is stored div 1200 so it fits into one byte
+      if (RDM6300_Serial->hardwareSerial()) {
+        ClaimSerial();
+      }
+    }
+  }
   rdm_blcnt=0;
 }
 
@@ -44,23 +52,25 @@ void RDM6300_ScanForTag() {
   uint8_t rdm_index;
   uint8_t rdm_array[6];
 
+  if (!RDM6300_Serial) return;
+
   if (rdm_blcnt>0) {
     rdm_blcnt--;
-    while (Serial.available()) Serial.read();
+    while (RDM6300_Serial->available()) RDM6300_Serial->read();
     return;
   }
 
-  if (Serial.available()) {
+  if (RDM6300_Serial->available()) {
 
-    char c=Serial.read();
+    char c=RDM6300_Serial->read();
     if (c!=2) return;
     // head detected
     // read rest of message 11 more bytes
     rdm_index=0;
     uint32_t cmillis=millis();
     while (1) {
-      if (Serial.available()) {
-        char c=Serial.read();
+      if (RDM6300_Serial->available()) {
+        char c=RDM6300_Serial->read();
         if (c==3) {
           // tail marker
           break;
@@ -98,10 +108,11 @@ void RDM6300_ScanForTag() {
     Response_P(PSTR("{\"" D_JSON_TIME "\":\"%s\""), GetDateAndTime(DT_LOCAL).c_str());
     ResponseAppend_P(PSTR(",\"RDM6300\":{\"UID\":\"%s\"}}"), rdm_uid_str);
     MqttPublishPrefixTopic_P(TELE, PSTR(D_RSLT_SENSOR), Settings.flag.mqtt_sensor_retain);
-
+/*
     char command[24];
     sprintf(command,"event RDM6300=%s",rdm_uid_str);
     ExecuteCommand(command, SRC_RULE);
+    */
   }
 
 
@@ -133,6 +144,7 @@ const char HTTP_RDM6300[] PROGMEM =
  "{s}RDM6300 " "UID" "{m}%s" "{e}";
 
 void RDM6300_Show(void) {
+  if (!RDM6300_Serial) return;
   if (!rdm_uid_str[0]) strcpy(rdm_uid_str,"????");
   WSContentSend_PD(HTTP_RDM6300,rdm_uid_str);
 }
