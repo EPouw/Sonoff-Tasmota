@@ -259,7 +259,12 @@ const char kSensorNames[] PROGMEM =
   D_SENSOR_LED_LINK "|" D_SENSOR_LED_LINK "i|"
   D_SENSOR_ARIRFSEL "|"
   D_SENSOR_BUZZER "|" D_SENSOR_BUZZER "i|"
-  D_SENSOR_OLED_RESET "|" D_SENSOR_IBEACON_TX "|" D_SENSOR_IBEACON_RX "|" D_SENSOR_RDM6300_RX "|" D_SENSOR_CC1101_CS "|"
+  D_SENSOR_OLED_RESET "|"
+  D_SENSOR_SOLAXX1_TX "|" D_SENSOR_SOLAXX1_RX "|"
+  D_SENSOR_ZIGBEE_TXD "|" D_SENSOR_ZIGBEE_RXD "|"
+  D_SENSOR_IBEACON_TX "|" D_SENSOR_IBEACON_RX "|"
+  D_SENSOR_RDM6300_RX "|"
+  D_SENSOR_CC1101_CS "|"
   ;
 
 // User selectable ADC0 functionality
@@ -585,6 +590,10 @@ const uint8_t kGpioNiceList[] PROGMEM = {
   GPIO_SBR_TX,         // Serial Bridge Serial interface
   GPIO_SBR_RX,         // Serial Bridge Serial interface
 #endif
+#ifdef USE_ZIGBEE
+  GPIO_ZIGBEE_TX,      // Zigbee Serial interface
+  GPIO_ZIGBEE_RX,      // Zigbee Serial interface
+#endif
 #ifdef USE_MHZ19
   GPIO_MHZ_TXD,        // MH-Z19 Serial interface
   GPIO_MHZ_RXD,        // MH-Z19 Serial interface
@@ -649,6 +658,10 @@ const uint8_t kGpioNiceList[] PROGMEM = {
 #ifdef USE_HRE
   GPIO_HRE_CLOCK,
   GPIO_HRE_DATA,
+#endif
+#ifdef USE_SOLAX_X1
+  GPIO_SOLAXX1_TX,     // Solax Inverter tx pin
+  GPIO_SOLAXX1_RX,     // Solax Inverter rx pin
 #endif
 #ifdef USE_RDM6300
   GPIO_RDM6300_RX,
