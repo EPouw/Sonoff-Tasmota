@@ -1,7 +1,7 @@
 /*
-  xsns_rdm6300.ino - Support for RDM6300 NFC Tag Reader
+  xsns_50_rdm6300.ino - Support for RDM6300 NFC Tag Reader
 
-  Copyright (C) 2019  Theo Arends and Gerhard Mutz
+  Copyright (C) 2019  Gerhard Mutz and Theo Arends
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 
 #ifdef USE_RDM6300
 
-#define XSNS_93                          93
+#define XSNS_50                          50
 
 #define RDM6300_BAUDRATE 9600
 
@@ -154,7 +154,7 @@ void RDM6300_Show(void) {
  * Interface
 \*********************************************************************************************/
 
-bool Xsns93(byte function)
+bool Xsns50(byte function)
 {
   bool result = false;
 

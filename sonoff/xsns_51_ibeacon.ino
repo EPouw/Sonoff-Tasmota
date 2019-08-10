@@ -1,5 +1,5 @@
 /*
-  xsns_92_ibeacon.ino - Support for HM17 BLE Module + ibeacon reader
+  xsns_51_ibeacon.ino - Support for HM17 BLE Module + ibeacon reader
 
   Copyright (C) 2019  Gerhard Mutz and Theo Arends
 
@@ -21,7 +21,7 @@
 
 #define IB_UPDATE_TIME_INTERVAL 10
 
-#define XSNS_92                          92
+#define XSNS_51                       51
 
 #include <TasmotaSerial.h>
 
@@ -285,7 +285,7 @@ void hm17_decode(void) {
         hm17_sbclr();
         if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("CONN OK"));
         hm17_connecting=2;
-        delay(500);
+        delay(1000);
         hm17_sendcmd(HM17_TEST);
         hm17_connecting=0;
         break;
@@ -439,7 +439,7 @@ sending IBEACON_FFFF3D1B1E9D_RSSI with data 99 causes tag to beep (ID to be repl
 
 
 
-bool XSNS_92_cmd(void) {
+bool xsns51_cmd(void) {
   bool serviced = true;
   const char S_JSON_IBEACON[] = "{\"" D_CMND_SENSOR "%d\":%s:%d}";
   const char S_JSON_IBEACON1[] = "{\"" D_CMND_SENSOR "%d\":%s:%s}";
@@ -448,7 +448,7 @@ bool XSNS_92_cmd(void) {
       char *cp=XdrvMailbox.data;
       if (*cp>='0' && *cp<='8') {
         hm17_sendcmd(*cp&7);
-        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON, XSNS_92,"hm17cmd",*cp&7);
+        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON, XSNS_51,"hm17cmd",*cp&7);
       } else if (*cp=='s') {
         cp++;
         len--;
@@ -458,22 +458,22 @@ bool XSNS_92_cmd(void) {
         }
         IBEACON_Serial->write((uint8_t*)cp,len);
         hm17_cmd=99;
-        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON1, XSNS_92,"hm17cmd",cp);
+        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON1, XSNS_51,"hm17cmd",cp);
       } else if (*cp=='u') {
         cp++;
         if (*cp) IB_UPDATE_TIME=atoi(cp);
-        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON, XSNS_92,"uintv",IB_UPDATE_TIME);
+        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON, XSNS_51,"uintv",IB_UPDATE_TIME);
       } else if (*cp=='t') {
         cp++;
         if (*cp) IB_TIMEOUT_TIME=atoi(cp);
-        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON, XSNS_92,"lintv",IB_TIMEOUT_TIME);
+        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON, XSNS_51,"lintv",IB_TIMEOUT_TIME);
       } else if (*cp=='c') {
         for (uint32_t cnt=0;cnt<MAX_IBEACONS;cnt++) ibeacons[cnt].FLAGS=0;
-        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON1, XSNS_92,"clr list","");
+        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON1, XSNS_51,"clr list","");
       } else if (*cp=='d') {
         cp++;
         if (*cp) hm17_debug=atoi(cp);
-        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON, XSNS_92,"debug",hm17_debug);
+        snprintf_P(mqtt_data, sizeof(mqtt_data), S_JSON_IBEACON, XSNS_51,"debug",hm17_debug);
       }
   } else {
     serviced=false;
@@ -530,7 +530,7 @@ void ibeacon_mqtt(const char *mac,const char *rssi) {
  * Interface
 \*********************************************************************************************/
 
-bool Xsns92(byte function)
+bool Xsns51(byte function)
 {
   bool result = false;
 
@@ -545,8 +545,8 @@ bool Xsns92(byte function)
         hm17_every_second();
         break;
       case FUNC_COMMAND_SENSOR:
-        if (XSNS_92 == XdrvMailbox.index) {
-          result = XSNS_92_cmd();
+        if (XSNS_51 == XdrvMailbox.index) {
+          result = xsns51_cmd();
         }
         break;
       case FUNC_COMMAND:
