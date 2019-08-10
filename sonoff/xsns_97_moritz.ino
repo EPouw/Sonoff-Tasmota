@@ -1337,9 +1337,6 @@ static Eeprom24C128_256 m_eeprom(EEPROM_ADDRESS);
 #define EEP_READ(A,B,C) m_eeprom.readBytes(A,B,(uint8_t*)C);
 #endif
 
-void Moritz_Init(void) {
-  moritz_cs=CC100_CS;
-}
 
 void CC1101_Detect() {
 uint8_t spi_set=0;
@@ -1617,7 +1614,7 @@ bool Xsns97(byte function) {
 
   switch (function) {
       case FUNC_MODULE_INIT:
-        Moritz_Init();
+        moritz_cs=CC100_CS;
         break;
       case FUNC_INIT:
         CC1101_Detect();
