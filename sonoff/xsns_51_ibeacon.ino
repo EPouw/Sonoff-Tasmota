@@ -79,6 +79,7 @@ void IBEACON_Init() {
 
   hm17_found=0;
 
+// actually doesnt work reliably with software serial
   if ((pin[GPIO_IBEACON_RX] < 99) && (pin[GPIO_IBEACON_TX] < 99)) {
     IBEACON_Serial = new TasmotaSerial(pin[GPIO_IBEACON_RX], pin[GPIO_IBEACON_TX],1);
     if (IBEACON_Serial->begin(HM17_BAUDRATE)) {
@@ -103,9 +104,6 @@ void hm17_every_second(void) {
         } else {
           if (!hm17_connecting) {
             hm17_sendcmd(HM17_DISI);
-            //if (hm17_flag&1) hm17_sendcmd(HM17_DISI);
-            //else hm17_sendcmd(HM17_DISC);
-            //hm17_flag^=1;
           }
         }
       }
@@ -199,8 +197,6 @@ uint32_t ibeacon_add(struct IBEACON *ib) {
   return 0;
 }
 
-
-
 void hm17_decode(void) {
   struct IBEACON ib;
   switch (hm17_cmd) {
@@ -210,29 +206,23 @@ void hm17_decode(void) {
         hm17_sbclr();
         hm17_result=HM17_SUCESS;
         hm17_found=1;
-        //hm17_sendcmd(HM17_IBEA);
       }
       break;
     case HM17_ROLE:
-      // OK+Set:1
       if (!strncmp(hm17_sbuffer,"OK+Set:1",8)) {
         if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("ROLE OK"));
         hm17_sbclr();
         hm17_result=HM17_SUCESS;
-        //hm17_sendcmd(HM17_IMME);
       }
       break;
     case HM17_IMME:
-      // OK+Set:1
       if (!strncmp(hm17_sbuffer,"OK+Set:1",8)) {
         if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("IMME OK"));
         hm17_sbclr();
         hm17_result=HM17_SUCESS;
-        //hm17_found=1;
       }
       break;
     case HM17_IBEA:
-      // OK+Set:1
       if (!strncmp(hm17_sbuffer,"OK+Set:1",8)) {
         if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("IBEA OK"));
         hm17_sbclr();
@@ -240,7 +230,6 @@ void hm17_decode(void) {
       }
       break;
     case HM17_SCAN:
-        // OK+Set:1
         if (!strncmp(hm17_sbuffer,"OK+Set:5",8)) {
           if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("SCAN OK"));
           hm17_sbclr();
@@ -248,7 +237,6 @@ void hm17_decode(void) {
         }
         break;
     case HM17_RESET:
-      // OK+Set:1
       if (!strncmp(hm17_sbuffer,"OK+RESET",8)) {
         if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("RESET OK"));
         hm17_sbclr();
@@ -256,7 +244,6 @@ void hm17_decode(void) {
       }
       break;
     case HM17_RENEW:
-      // OK+Set:1
       if (!strncmp(hm17_sbuffer,"OK+RENEW",8)) {
         if (hm17_debug) AddLog_P2(LOG_LEVEL_INFO, PSTR("RENEW OK"));
         hm17_sbclr();
