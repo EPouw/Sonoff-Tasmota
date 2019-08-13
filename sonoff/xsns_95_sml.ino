@@ -5,7 +5,7 @@ da durch die begrenzte Hardwareunterstützung das software serial nicht optimal 
 ist es mit der originalen TasmotaSerial nicht möglich 3 Zähler gleichzeitig abzufragen
 
 durch Modifikation des Tasmota Serial Drivers sollten jetzt auch mehr als 2 Zähler
-funktionieren. Dazu muss auch die modifizierte TasmotaSerial-2.3.0 ebenfalls kopiert werden
+funktionieren. Dazu muss auch die modifizierte TasmotaSerial-2.3.2 ebenfalls kopiert werden
 
 jetzt auch mit Unterstützung für Gas und Wasserzähler
 Zähler setzen mit Sensor95 c1 xxx, Sensor95 c2 xxx etc
