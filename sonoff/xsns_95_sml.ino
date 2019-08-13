@@ -13,6 +13,45 @@ Zähler setzen mit Sensor95 c1 xxx, Sensor95 c2 xxx etc
 nur dieser Treiber wird in Zukunft weiterentwickelt
 die älteren werden nicht mehr unterstützt.
 
+durch die Einführung des Script Editors war es möglich die Zählerdefintion in den Scripteditor zu verlagern.
+damit braucht man nur noch eine einzige Softwareversion und kann die Zählerdefintion beliebig im Scripteditor nachladen
+
+Beispielscript für den WGS_COMBO descriptor:
+
+>D
+
+>M 3
++1,1,c,0,10,H20
++2,4,c,0,50,GAS
++3,3,s,0,9600,SML
+
+-1,1-0:1.8.0*255(@10000,Zählerstand,cbm,Count,4|
+-2,=h==================|
+-2,1-0:1.8.0*255(@100,Zählerstand,cbm,Count,3|
+-3,77070100010800ff@1000,Verbrauch,KWh,Total_in,3|
+-3,=h==================|
+-3,77070100100700ff@1,Aktueller Verbrauch,W,Power_curr,2|
+-3,=h -------------------------------|
+-3,=m 10+11+12 @100,Ströme L1+L2+L3,A,Curr_summ,2|
+-3,=m 13+14+15/#3 @100,Spannung L1+L2+L3/3,V,Volt_avg,2|
+-3,=h==================|
+-3,77070100240700ff@1,Verbrauch P1,W,Power_p1,2|
+-3,77070100380700ff@1,Verbrauch P2,W,Power_p2,2|
+-3,770701004c0700ff@1,Verbrauch P3,W,Power_p3,2|
+-3,=h -------------------------------|
+-3,770701001f0700ff@100,Strom L1,A,Curr_p1,2|
+-3,77070100330700ff@100,Strom L2,A,Curr_p2,2|
+-3,77070100470700ff@100,Strom L3,A,Curr_p3,2|
+-3,=h -------------------------------|
+-3,77070100200700ff@100,Spannung L1,V,Volt_p1,2|
+-3,77070100340700ff@100,Spannung L2,V,Volt_p2,2|
+-3,77070100480700ff@100,Spannung L3,V,Volt_p3,2|
+-3,=h==================|
+-3,77070100000009ff@#,Service ID,,Meter_id,0|
+-3,=h--------------------------------
+#
+
+
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
   xsns_95_sml.ino - SML smart meter interface for Sonoff-Tasmota
@@ -525,23 +564,28 @@ const uint8_t meter[]=
 // um möglichst viel RAM zu sparen sollte MAX_VARS der Anzahl der Zeilen
 // in der Defintion entsprechen, insbesondere bei Verwendung des Medianfilters.
 #define MAX_VARS 16
+#define MAX_METERS 5
 double meter_vars[MAX_VARS];
 // deltas berechnen
-#define MAX_DVARS METERS_USED*2
+#define MAX_DVARS MAX_METERS*2
 double dvalues[MAX_DVARS];
 uint32_t dtimes[MAX_DVARS];
+uint8_t meters_used;
+
+struct METER_DESC const *meter_desc_p;
+const uint8_t *meter_p;
 
 // software serial pointers
-TasmotaSerial *meter_ss[METERS_USED];
+TasmotaSerial *meter_ss[MAX_METERS];
 
 // serial buffers, bei einigen Zählern sollte man hier einen größeren Buffer definieren
 // z.B. 48
 #define SML_BSIZ 32
-uint8_t smltbuf[METERS_USED][SML_BSIZ];
+uint8_t smltbuf[MAX_METERS][SML_BSIZ];
 
 // meter nr as string
 #define METER_ID_SIZE 24
-char meter_id[METERS_USED][METER_ID_SIZE];
+char meter_id[MAX_METERS][METER_ID_SIZE];
 
 #ifdef USE_MEDIAN_FILTER
 // median filter, should be odd size
@@ -818,7 +862,7 @@ uint8_t dump2log=0;
 
 bool Serial_available() {
   uint8_t num=dump2log&7;
-  if (num<1 || num>METERS_USED) return Serial.available();
+  if (num<1 || num>meters_used) return Serial.available();
   if (num==1) {
       return Serial.available();
   } else {
@@ -828,7 +872,7 @@ bool Serial_available() {
 
 uint8_t Serial_read() {
   uint8_t num=dump2log&7;
-  if (num<1 || num>METERS_USED) return Serial.read();
+  if (num<1 || num>meters_used) return Serial.read();
   if (num==1) {
       return Serial.read();
   } else {
@@ -838,7 +882,7 @@ uint8_t Serial_read() {
 
 uint8_t Serial_peek() {
   uint8_t num=dump2log&7;
-  if (num<1 || num>METERS_USED) return Serial.peek();
+  if (num<1 || num>meters_used) return Serial.peek();
   if (num==1) {
       return Serial.peek();
   } else {
@@ -906,7 +950,7 @@ uint8_t dchars[16];
       d_lastms=millis();
       while ((millis()-d_lastms)<40) {
         if (SML_SAVAILABLE) {
-          if (meter_desc[(dump2log&7)-1].type=='o') {
+          if (meter_desc_p[(dump2log&7)-1].type=='o') {
             char c=SML_SREAD&0x7f;
             if (c=='\n' || c=='\r') break;
             log_data[index]=c;
@@ -1128,16 +1172,16 @@ double xCharToDouble(const char *str)
 void SML_Poll(void) {
     uint16_t count,meters;
 
-    for (meters=0; meters<METERS_USED; meters++) {
-      if (meter_desc[meters].type!='c') {
+    for (meters=0; meters<meters_used; meters++) {
+      if (meter_desc_p[meters].type!='c') {
         // poll for serial input
-        if (!meter_desc[meters].srcpin || meter_desc[meters].srcpin==3) {
+        if (!meter_desc_p[meters].srcpin || meter_desc_p[meters].srcpin==3) {
           while (Serial.available()) {
             // shift in
             for (count=0; count<SML_BSIZ-1; count++) {
               smltbuf[meters][count]=smltbuf[meters][count+1];
             }
-            if (meter_desc[meters].type=='o') {
+            if (meter_desc_p[meters].type=='o') {
               smltbuf[meters][SML_BSIZ-1]=(uint8_t)Serial.read()&0x7f;
             } else {
               smltbuf[meters][SML_BSIZ-1]=(uint8_t)Serial.read();
@@ -1151,7 +1195,7 @@ void SML_Poll(void) {
             for (count=0; count<SML_BSIZ-1; count++) {
               smltbuf[meters][count]=smltbuf[meters][count+1];
             }
-            if (meter_desc[meters].type=='o') {
+            if (meter_desc_p[meters].type=='o') {
               smltbuf[meters][SML_BSIZ-1]=(uint8_t)meter_ss[meters]->read()&0x7f;
             } else {
               smltbuf[meters][SML_BSIZ-1]=(uint8_t)meter_ss[meters]->read();
@@ -1166,7 +1210,7 @@ void SML_Poll(void) {
 
 
 void SML_Decode(uint8_t index) {
-  const char *mp=(const char*)meter;
+  const char *mp=(const char*)meter_p;
   int8_t mindex;
   uint8_t *cp;
   uint8_t dindex=0,vindex=0;
@@ -1177,7 +1221,7 @@ void SML_Decode(uint8_t index) {
     // new section
     mindex=((*mp)&7)-1;
 
-    if (mindex<0 || mindex>=METERS_USED) mindex=0;
+    if (mindex<0 || mindex>=meters_used) mindex=0;
     mp+=2;
     if (*mp=='=' && *(mp+1)=='h') {
       mp = strchr(mp, '|');
@@ -1289,7 +1333,7 @@ void SML_Decode(uint8_t index) {
       // compare value
       uint8_t found=1;
       while (*mp!='@') {
-        if (meter_desc[mindex].type=='o' || meter_desc[mindex].type=='c') {
+        if (meter_desc_p[mindex].type=='o' || meter_desc_p[mindex].type=='c') {
           if (*mp++!=*cp++) {
             found=0;
           }
@@ -1307,7 +1351,7 @@ void SML_Decode(uint8_t index) {
         if (*mp=='#') {
           // get string value
           mp++;
-          if (meter_desc[mindex].type=='o') {
+          if (meter_desc_p[mindex].type=='o') {
             for (uint8_t p=0;p<METER_ID_SIZE;p++) {
               if (*cp==*mp) {
                 meter_id[mindex][p]=0;
@@ -1321,7 +1365,7 @@ void SML_Decode(uint8_t index) {
         } else {
           double dval;
           // get numeric values
-          if (meter_desc[mindex].type=='o' || meter_desc[mindex].type=='c') {
+          if (meter_desc_p[mindex].type=='o' || meter_desc_p[mindex].type=='c') {
             dval=xCharToDouble((char*)cp);
           } else {
             dval=sml_getvalue(cp,mindex);
@@ -1379,7 +1423,7 @@ void SML_Immediate_MQTT(const char *mp,uint8_t index,uint8_t mindex) {
           // immediate mqtt
           dtostrfd(meter_vars[index],dp&0xf,tpowstr);
           snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("{\"" D_JSON_TIME "\":\"%s\""), GetDateAndTime(DT_LOCAL).c_str());
-          snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("%s,\"%s\":{ \"%s\":%s}}"), mqtt_data,meter_desc[mindex].prefix,jname,tpowstr);
+          snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("%s,\"%s\":{ \"%s\":%s}}"), mqtt_data,meter_desc_p[mindex].prefix,jname,tpowstr);
           MqttPublishPrefixTopic_P(TELE, PSTR(D_RSLT_SENSOR), Settings.flag.mqtt_sensor_retain);
         }
       }
@@ -1395,17 +1439,17 @@ void SML_Show(boolean json) {
   char unit[8];
   char jname[24];
   int8_t index=0,mid=0;
-  char *mp=(char*)meter;
+  char *mp=(char*)meter_p;
   char *cp;
   //char b_mqtt_data[MESSZ];
   //b_mqtt_data[0]=0;
 
     int8_t lastmind=((*mp)&7)-1;
-    if (lastmind<0 || lastmind>=METERS_USED) lastmind=0;
+    if (lastmind<0 || lastmind>=meters_used) lastmind=0;
     while (mp != NULL) {
         // setup sections
         mindex=((*mp)&7)-1;
-        if (mindex<0 || mindex>=METERS_USED) mindex=0;
+        if (mindex<0 || mindex>=meters_used) mindex=0;
         mp+=2;
         if (*mp=='=' && *(mp+1)=='h') {
           mp+=2;
@@ -1483,8 +1527,8 @@ void SML_Show(boolean json) {
             if (json) {
               // json export
               if (index==0) {
-                //snprintf_P(b_mqtt_data, sizeof(b_mqtt_data), "%s,\"%s\":{\"%s\":%s", b_mqtt_data,meter_desc[mindex].prefix,jname,tpowstr);
-                ResponseAppend_P(PSTR(",\"%s\":{\"%s\":%s"),meter_desc[mindex].prefix,jname,tpowstr);
+                //snprintf_P(b_mqtt_data, sizeof(b_mqtt_data), "%s,\"%s\":{\"%s\":%s", b_mqtt_data,meter_desc_p[mindex].prefix,jname,tpowstr);
+                ResponseAppend_P(PSTR(",\"%s\":{\"%s\":%s"),meter_desc_p[mindex].prefix,jname,tpowstr);
               }
               else {
                 if (lastmind!=mindex) {
@@ -1492,8 +1536,8 @@ void SML_Show(boolean json) {
                   //snprintf_P(b_mqtt_data, sizeof(b_mqtt_data), "%s}", b_mqtt_data);
                   ResponseAppend_P(PSTR("}"));
                   // and open new
-                  //snprintf_P(b_mqtt_data, sizeof(b_mqtt_data), "%s,\"%s\":{\"%s\":%s", b_mqtt_data,meter_desc[mindex].prefix,jname,tpowstr);
-                  ResponseAppend_P(PSTR(",\"%s\":{\"%s\":%s"),meter_desc[mindex].prefix,jname,tpowstr);
+                  //snprintf_P(b_mqtt_data, sizeof(b_mqtt_data), "%s,\"%s\":{\"%s\":%s", b_mqtt_data,meter_desc_p[mindex].prefix,jname,tpowstr);
+                  ResponseAppend_P(PSTR(",\"%s\":{\"%s\":%s"),meter_desc_p[mindex].prefix,jname,tpowstr);
                   lastmind=mindex;
                 } else {
                   //snprintf_P(b_mqtt_data, sizeof(b_mqtt_data), "%s,\"%s\":%s", b_mqtt_data,jname,tpowstr);
@@ -1503,7 +1547,7 @@ void SML_Show(boolean json) {
             } else {
               // web ui export
               //snprintf_P(b_mqtt_data, sizeof(b_mqtt_data), "%s{s}%s %s: {m}%s %s{e}", b_mqtt_data,meter_desc[mindex].prefix,name,tpowstr,unit);
-              WSContentSend_PD(PSTR("{s}%s %s: {m}%s %s{e}"),meter_desc[mindex].prefix,name,tpowstr,unit);
+              WSContentSend_PD(PSTR("{s}%s %s: {m}%s %s{e}"),meter_desc_p[mindex].prefix,name,tpowstr,unit);
             }
           }
         }
@@ -1571,7 +1615,101 @@ void SML_CounterUpd4(void) {
   SML_CounterUpd(3);
 }
 
+#ifdef USE_SCRIPT
+struct METER_DESC  script_meter_desc[MAX_METERS];
+uint8_t *script_meter;
+#endif
+
+#define METER_DEF_SIZE 2000
+
 void SML_Init(void) {
+  meters_used=METERS_USED;
+  meter_desc_p=meter_desc;
+  meter_p=meter;
+
+#ifdef USE_SCRIPT
+  uint8_t meter_script=Run_Scripter(">M",-2,0);
+  if (meter_script==99) {
+    // use script definition
+    if (script_meter) free(script_meter);
+    script_meter=(uint8_t*)calloc(METER_DEF_SIZE,1);
+    uint8_t *tp=script_meter;
+    uint16_t index=0;
+    uint8_t section=0;
+    char *lp=glob_script_mem.scriptptr;
+    while (lp) {
+      if (*lp=='#') break;
+      if (!section) {
+        if (*lp=='>' && *(lp+1)=='M') {
+          lp+=2;
+          meters_used=strtol(lp,0,10);
+          section=1;
+          goto next_line;
+        }
+      }
+      else {
+        if (*lp=='+') {
+          // add descriptor +1,1,c,0,10,H20
+          //toLogEOL(">>",lp);
+          lp++;
+          uint8_t index=*lp&7;
+          lp+=2;
+          if (index<1 || index>meters_used) goto next_line;
+          index--;
+          script_meter_desc[index].srcpin=strtol(lp,&lp,10);
+          if (*lp!=',') goto next_line;
+          lp++;
+          script_meter_desc[index].type=*lp;
+          lp+=2;
+          script_meter_desc[index].flag=strtol(lp,&lp,10);
+          if (*lp!=',') goto next_line;
+          lp++;
+          script_meter_desc[index].params=strtol(lp,&lp,10);
+          if (*lp!=',') goto next_line;
+          lp++;
+          script_meter_desc[index].prefix[7]=0;
+          for (uint32_t cnt=0; cnt<8; cnt++) {
+            if (*lp==SCRIPT_EOL) {
+              script_meter_desc[index].prefix[cnt]=0;
+              lp--;
+              break;
+            }
+            script_meter_desc[index].prefix[cnt]=*lp++;
+          }
+          goto next_line;
+        }
+
+        if (*lp=='-') {
+          //toLogEOL(">>",lp);
+          // add meters line -1,1-0:1.8.0*255(@10000,H2OIN,cbm,COUNTER,4|
+          lp++;
+          while (1) {
+            if (*lp==SCRIPT_EOL) {
+              goto next_line;
+            }
+            *tp++=*lp++;
+            index++;
+            if (index>=METER_DEF_SIZE) break;
+          }
+        }
+
+      }
+
+next_line:
+      if (*lp==SCRIPT_EOL) {
+        lp++;
+      } else {
+        lp = strchr(lp, SCRIPT_EOL);
+        if (!lp) break;
+        lp++;
+      }
+    }
+    *tp=0;
+    //meter_desc_p=script_meter_desc;
+    //meter_p=script_meter;
+  }
+#endif
+
   typedef void (*function)();
   function counter_callbacks[] = {SML_CounterUpd1,SML_CounterUpd2,SML_CounterUpd3,SML_CounterUpd4};
   uint8_t cindex=0;
@@ -1580,9 +1718,9 @@ void SML_Init(void) {
       RtcSettings.pulse_counter[i]=Settings.pulse_counter[i];
       sml_counters[i].sml_cnt_last_ts=millis();
   }
-  for (uint8_t meters=0; meters<METERS_USED; meters++) {
-    if (meter_desc[meters].type=='c') {
-        if (meter_desc[meters].flag&2) {
+  for (uint8_t meters=0; meters<meters_used; meters++) {
+    if (meter_desc_p[meters].type=='c') {
+        if (meter_desc_p[meters].flag&2) {
           // analog mode
 #ifdef ANALOG_OPTO_SENSOR
           ADS1115_init();
@@ -1591,15 +1729,15 @@ void SML_Init(void) {
 #endif
         } else {
           // counters, set to input with pullup
-          if (meter_desc[meters].flag&1) {
-            pinMode(meter_desc[meters].srcpin,INPUT_PULLUP);
+          if (meter_desc_p[meters].flag&1) {
+            pinMode(meter_desc_p[meters].srcpin,INPUT_PULLUP);
           } else {
-            pinMode(meter_desc[meters].srcpin,INPUT);
+            pinMode(meter_desc_p[meters].srcpin,INPUT);
           }
           // check for irq mode
-          if (!meter_desc[meters].params) {
+          if (!meter_desc_p[meters].params) {
             // init irq mode
-            attachInterrupt(meter_desc[meters].srcpin, counter_callbacks[cindex], FALLING);
+            attachInterrupt(meter_desc_p[meters].srcpin, counter_callbacks[cindex], FALLING);
             sml_counters[cindex].sml_cnt_old_state=meters;
           }
           InjektCounterValue(meters,RtcSettings.pulse_counter[cindex]);
@@ -1607,16 +1745,16 @@ void SML_Init(void) {
         }
     } else {
       // serial input, init
-      if (!meter_desc[meters].srcpin || meter_desc[meters].srcpin==3) {
+      if (!meter_desc_p[meters].srcpin || meter_desc_p[meters].srcpin==3) {
         ClaimSerial();
-        SetSerialBaudrate(meter_desc[meters].params);
+        SetSerialBaudrate(meter_desc_p[meters].params);
       } else {
 #ifdef SPECIAL_SS
-        meter_ss[meters] = new TasmotaSerial(meter_desc[meters].srcpin,-1,0,1);
+        meter_ss[meters] = new TasmotaSerial(meter_desc_p[meters].srcpin,-1,0,1);
 #else
-        meter_ss[meters] = new TasmotaSerial(meter_desc[meters].srcpin,-1);
+        meter_ss[meters] = new TasmotaSerial(meter_desc_p[meters].srcpin,-1);
 #endif
-        if (meter_ss[meters]->begin(meter_desc[meters].params)) {
+        if (meter_ss[meters]->begin(meter_desc_p[meters].params)) {
           meter_ss[meters]->flush();
         }
       }
@@ -1640,14 +1778,14 @@ void SML_Counter_Poll(void) {
 uint16_t meters,cindex=0;
 uint32_t ctime=millis();
 
-  for (meters=0; meters<METERS_USED; meters++) {
-    if (meter_desc[meters].type=='c') {
+  for (meters=0; meters<meters_used; meters++) {
+    if (meter_desc_p[meters].type=='c') {
       // poll for counters and debouce
-      if (meter_desc[meters].params) {
-        if (ctime-sml_counters[cindex].sml_cnt_last_ts>meter_desc[meters].params) {
+      if (meter_desc_p[meters].params) {
+        if (ctime-sml_counters[cindex].sml_cnt_last_ts>meter_desc_p[meters].params) {
           sml_counters[cindex].sml_cnt_last_ts=ctime;
 
-          if (meter_desc[meters].flag&2) {
+          if (meter_desc_p[meters].flag&2) {
             // analog mode, get next value
 #ifdef ANALOG_OPTO_SENSOR
             if (ads1115_up) {
@@ -1662,7 +1800,7 @@ uint32_t ctime=millis();
             // poll digital input
             uint8_t state;
             sml_counters[cindex].sml_cnt_debounce<<=1;
-            sml_counters[cindex].sml_cnt_debounce|=(digitalRead(meter_desc[meters].srcpin)&1)|0x80;
+            sml_counters[cindex].sml_cnt_debounce|=(digitalRead(meter_desc_p[meters].srcpin)&1)|0x80;
             if (sml_counters[cindex].sml_cnt_debounce==0xc0) {
               // is 1
               state=1;
@@ -1682,19 +1820,19 @@ uint32_t ctime=millis();
           }
         }
 #ifdef DEBUG_CNT_LED1
-        if (cindex==0) SetDBGLed(meter_desc[meters].srcpin,DEBUG_CNT_LED1);
+        if (cindex==0) SetDBGLed(meter_desc_p[meters].srcpin,DEBUG_CNT_LED1);
 #endif
 #ifdef DEBUG_CNT_LED2
-        if (cindex==1) SetDBGLed(meter_desc[meters].srcpin,DEBUG_CNT_LED2);
+        if (cindex==1) SetDBGLed(meter_desc_p[meters].srcpin,DEBUG_CNT_LED2);
 #endif
       } else {
         if (ctime-sml_counters[cindex].sml_cnt_last_ts>10) {
           sml_counters[cindex].sml_cnt_last_ts=ctime;
 #ifdef DEBUG_CNT_LED1
-          if (cindex==0) SetDBGLed(meter_desc[meters].srcpin,DEBUG_CNT_LED1);
+          if (cindex==0) SetDBGLed(meter_desc_p[meters].srcpin,DEBUG_CNT_LED1);
 #endif
 #ifdef DEBUG_CNT_LED2
-          if (cindex==1) SetDBGLed(meter_desc[meters].srcpin,DEBUG_CNT_LED2);
+          if (cindex==1) SetDBGLed(meter_desc_p[meters].srcpin,DEBUG_CNT_LED2);
 #endif
         }
       }
@@ -1757,8 +1895,8 @@ bool XSNS_95_cmd(void) {
             while (isdigit(*cp)) cp++;
             RtcSettings.pulse_counter[index-1]=cval;
             uint8_t cindex=0;
-            for (uint8_t meters=0; meters<METERS_USED; meters++) {
-              if (meter_desc[meters].type=='c') {
+            for (uint8_t meters=0; meters<meters_used; meters++) {
+              if (meter_desc_p[meters].type=='c') {
                 InjektCounterValue(meters,RtcSettings.pulse_counter[cindex]);
                 cindex++;
               }
