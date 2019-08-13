@@ -56,7 +56,7 @@ Beispielscript für den WGS_COMBO, EHZ161, EHZ363 descriptor:
 >D
 
 >M 1
-+1,o,0,9600,OBIS
++1,0,o,0,9600,OBIS
 
 -1,1-0:1.8.0*255(@1,Verbrauch,KWh,Total_in,4|
 -1,1-0:2.8.0*255(@1,Einspeisung,KWh,Total_out,4|
