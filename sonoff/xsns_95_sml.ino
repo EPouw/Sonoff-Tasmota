@@ -16,8 +16,9 @@ die älteren werden nicht mehr unterstützt.
 durch die Einführung des Script Editors war es möglich die Zählerdefintion in den Scripteditor zu verlagern.
 damit braucht man nur noch eine einzige Softwareversion und kann die Zählerdefintion beliebig im Scripteditor nachladen
 
-Beispielscript für den WGS_COMBO descriptor:
+Beispielscript für den WGS_COMBO, EHZ161, EHZ363 descriptor:
 
+;WGS_COMBO
 >D
 
 >M 3
@@ -51,6 +52,32 @@ Beispielscript für den WGS_COMBO descriptor:
 -3,=h--------------------------------
 #
 
+;EHZ161
+>D
+
+>M 1
++1,o,0,9600,OBIS
+
+-1,1-0:1.8.0*255(@1,Verbrauch,KWh,Total_in,4|
+-1,1-0:2.8.0*255(@1,Einspeisung,KWh,Total_out,4|
+-1,1-0:21.7.0*255(@1,Verbrauch P1,W,Power_p1,0|
+-1,1-0:41.7.0*255(@1,Verbrauch P2,W,Power_p2,0|
+-1,1-0:61.7.0*255(@1,Verbrauch P3,W,Power_p3,0|
+-1,=m 3+4+5 @1,Aktueller Verbrauch,W,Power_curr,0|
+-1,1-0:0.0.0*255(@#),Zähler Nr,,Meter_number,0
+#
+
+;EHZ363
+>D
+
+>M 1
++1,0,s,0,9600,SML
+
+-1,77070100010800ff@1000,Verbrauch,KWh,Total_in,4|
+-1,77070100020800ff@1000,Einspeisung,KWh,Total_out,4|
+-1,77070100100700ff@1,Aktueller Verbrauch,W,Power_curr,0|
+-1,77070100000009ff@#,Zähler Nr,,Meter_number,0
+#
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
