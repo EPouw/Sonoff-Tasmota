@@ -1449,8 +1449,8 @@ void SML_Immediate_MQTT(const char *mp,uint8_t index,uint8_t mindex) {
         if (dp&0x10) {
           // immediate mqtt
           dtostrfd(meter_vars[index],dp&0xf,tpowstr);
-          snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("{\"" D_JSON_TIME "\":\"%s\""), GetDateAndTime(DT_LOCAL).c_str());
-          snprintf_P(mqtt_data, sizeof(mqtt_data), PSTR("%s,\"%s\":{ \"%s\":%s}}"), mqtt_data,meter_desc_p[mindex].prefix,jname,tpowstr);
+          Response_P(PSTR("{\"" D_JSON_TIME "\":\"%s\""), GetDateAndTime(DT_LOCAL).c_str());
+          ResponseAppend_P(PSTR("%s,\"%s\":{ \"%s\":%s}}"), mqtt_data,meter_desc_p[mindex].prefix,jname,tpowstr);
           MqttPublishPrefixTopic_P(TELE, PSTR(D_RSLT_SENSOR), Settings.flag.mqtt_sensor_retain);
         }
       }
