@@ -389,7 +389,11 @@ struct SYSCFG {
   uint32_t      deepsleep;                 // E94
   uint16_t      energy_power_delta;        // E98
 
+#if MAX_RULE_SIZE==512
   uint8_t       free_e9a[350];             // E9A
+#else
+  uint8_t       free_e9a[50];             // E9A
+#endif
 
   uint32_t      cfg_timestamp;             // FF8
   uint32_t      cfg_crc32;                 // FFC
