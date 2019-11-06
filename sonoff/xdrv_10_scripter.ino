@@ -1058,6 +1058,17 @@ char *isvar(char *lp, uint8_t *vtype,struct T_INDEX *tind,float *fp,char *sp,Jso
 
 chknext:
     switch (vname[0]) {
+      case 'a':
+#ifdef USE_ANGLE_FUNC
+        if (!strncmp(vname,"acos[",5)) {
+            GetNumericResult(vname+5,OPER_EQU,&fvar,0);
+            fvar=acosf(fvar);
+            len+=1;
+            goto exit;
+        }
+#endif
+        break;
+
       case 'b':
         if (!strncmp(vname,"boot",4)) {
           if (rules_flag.system_boot) {
@@ -1674,6 +1685,14 @@ chknext:
           } else {
             fvar=-1;
           }
+          len+=1;
+          goto exit;
+        }
+#endif
+#ifdef USE_ANGLE_FUNC
+        if (!strncmp(vname,"sin[",4)) {
+          GetNumericResult(vname+4,OPER_EQU,&fvar,0);
+          fvar=sinf(fvar);
           len+=1;
           goto exit;
         }
