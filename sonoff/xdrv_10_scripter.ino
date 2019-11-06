@@ -1060,7 +1060,7 @@ chknext:
     switch (vname[0]) {
       case 'a':
 #ifdef USE_ANGLE_FUNC
-        if (!strncmp(vname,"acos[",5)) {
+        if (!strncmp(vname,"acos(",5)) {
             GetNumericResult(vname+5,OPER_EQU,&fvar,0);
             fvar=acosf(fvar);
             len+=1;
@@ -1690,7 +1690,7 @@ chknext:
         }
 #endif
 #ifdef USE_ANGLE_FUNC
-        if (!strncmp(vname,"sin[",4)) {
+        if (!strncmp(vname,"sin(",4)) {
           GetNumericResult(vname+4,OPER_EQU,&fvar,0);
           fvar=sinf(fvar);
           len+=1;
