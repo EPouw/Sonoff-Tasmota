@@ -1700,6 +1700,14 @@ chknext:
           len=0;
           goto exit;
         }
+        if (!strncmp(vname,"sqrt(",5)) {
+          lp+=5;
+          lp=GetNumericResult(lp,OPER_EQU,&fvar,0);
+          fvar=sqrtf(fvar);
+          lp++;
+          len=0;
+          goto exit;
+        }
 #endif
         break;
       case 't':
