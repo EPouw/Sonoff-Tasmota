@@ -2061,7 +2061,7 @@ init10:
     } else {
       // serial input, init
 #ifdef SPECIAL_SS
-        if (meter_desc_p[meters].type=='m' || meter_desc_p[meters].type=='p') {
+        if (meter_desc_p[meters].type=='m' || meter_desc_p[meters].type=='M' || meter_desc_p[meters].type=='p') {
           meter_ss[meters] = new TasmotaSerial(meter_desc_p[meters].srcpin,meter_desc_p[meters].trxpin,1);
         } else {
           meter_ss[meters] = new TasmotaSerial(meter_desc_p[meters].srcpin,meter_desc_p[meters].trxpin,1,1);
@@ -2072,7 +2072,12 @@ init10:
         if (meter_ss[meters]->begin(meter_desc_p[meters].params)) {
           meter_ss[meters]->flush();
         }
-        if (meter_ss[meters]->hardwareSerial()) { ClaimSerial(); }
+        if (meter_ss[meters]->hardwareSerial()) {
+          if (meter_desc_p[meters].type=='M') {
+            Serial.begin(meter_desc_p[meters].params, SERIAL_8E1);
+          }
+          ClaimSerial();
+        }
 
     }
   }
